@@ -1,10 +1,19 @@
 import { create } from 'zustand'
 
+// Realistic Falcon 9 parameters (must match backend)
+const INITIAL_FUEL = 3000  // kg - very limited!
+const INITIAL_ALTITUDE = 5000  // m
+const INITIAL_VELOCITY = -180  // m/s
+const DRY_MASS = 22200  // kg
+
 const useGameStore = create((set, get) => ({
   // Connection state
   connected: false,
   sessionId: null,
   ws: null,
+  
+  // Previous velocity for acceleration calculation
+  prevVelocity: [0, INITIAL_VELOCITY, 0],
   
   // Game state from server
   gameState: {
@@ -14,17 +23,17 @@ const useGameStore = create((set, get) => ({
     score: 0,
     mode: 'manual',
     rocket: {
-      position: [0, 5000, 0],
-      velocity: [0, -200, 0],
+      position: [0, INITIAL_ALTITUDE, 0],
+      velocity: [0, INITIAL_VELOCITY, 0],
       orientation: [1, 0, 0, 0],
-      fuel: 30000,
+      fuel: INITIAL_FUEL,
       throttle: 0,
       gimbal: [0, 0],
-      altitude: 5000,
-      speed: 200,
-      vertical_speed: -200,
+      altitude: INITIAL_ALTITUDE,
+      speed: Math.abs(INITIAL_VELOCITY),
+      vertical_speed: INITIAL_VELOCITY,
       horizontal_speed: 0,
-      mass: 52200,
+      mass: DRY_MASS + INITIAL_FUEL,  // Total mass = dry + fuel
       phase: 'descent',
       landed: false,
       crashed: false,
@@ -45,7 +54,13 @@ const useGameStore = create((set, get) => ({
   setSessionId: (sessionId) => set({ sessionId }),
   setWs: (ws) => set({ ws }),
   
-  setGameState: (gameState) => set({ gameState }),
+  setGameState: (gameState) => {
+    const currentState = get().gameState
+    set({ 
+      gameState,
+      prevVelocity: currentState.rocket.velocity 
+    })
+  },
   
   setThrottle: (throttle) => {
     set({ throttle })
@@ -102,7 +117,12 @@ const useGameStore = create((set, get) => ({
     const { ws, connected } = get()
     if (ws && connected) {
       ws.send(JSON.stringify({ type: 'reset' }))
-      set({ throttle: 0, gimbal: [0, 0], showMenu: true })
+      set({ 
+        throttle: 0, 
+        gimbal: [0, 0], 
+        showMenu: true, 
+        prevVelocity: [0, INITIAL_VELOCITY, 0] 
+      })
     }
   },
   
@@ -125,7 +145,11 @@ const useGameStore = create((set, get) => ({
       if (message.type === 'state' || message.type === 'connected' || 
           message.type === 'started' || message.type === 'reset') {
         if (message.data) {
-          set({ gameState: message.data })
+          const currentState = get().gameState
+          set({ 
+            gameState: message.data,
+            prevVelocity: currentState.rocket.velocity
+          })
         }
       }
     }
@@ -152,4 +176,3 @@ const useGameStore = create((set, get) => ({
 }))
 
 export default useGameStore
-

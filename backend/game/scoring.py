@@ -4,7 +4,7 @@ import numpy as np
 from physics.constants import (
     ROCKET_FUEL_MASS,
     LANDING_PAD_RADIUS,
-    MAX_LANDING_VELOCITY,
+    MAX_LANDING_VELOCITY_VERTICAL,
 )
 
 
@@ -39,12 +39,8 @@ def calculate_score(state, elapsed_time: float) -> int:
     score += accuracy_score
     
     # Velocity bonus (0-2000)
-    # Final velocity should be stored before zeroing, but we use landing threshold
-    # Lower velocity = higher score
-    # At max landing velocity (2 m/s), score = 1000
-    # At 0 m/s, score = 2000
-    touchdown_velocity = MAX_LANDING_VELOCITY  # Approximate, since we zeroed velocity
-    velocity_score = int(2000 * (1 - touchdown_velocity / (MAX_LANDING_VELOCITY * 2)))
+    touchdown_velocity = MAX_LANDING_VELOCITY_VERTICAL
+    velocity_score = int(2000 * (1 - touchdown_velocity / (MAX_LANDING_VELOCITY_VERTICAL * 2)))
     velocity_score = max(0, velocity_score)
     score += velocity_score
     
@@ -54,14 +50,10 @@ def calculate_score(state, elapsed_time: float) -> int:
     score += fuel_score
     
     # Attitude bonus (0-1500)
-    # We don't have exact tilt angle stored, so give full points for successful landing
     attitude_score = 1500
     score += attitude_score
     
     # Time bonus (0-1500)
-    # Faster landing = more points
-    # Base time expectation: 60 seconds
-    # Under 30s = max bonus, over 90s = no bonus
     if elapsed_time < 30:
         time_score = 1500
     elif elapsed_time > 90:

@@ -8,15 +8,19 @@ from .constants import (
     ROCKET_DRY_MASS,
     ROCKET_FUEL_MASS,
     ROCKET_CROSS_SECTION,
-    DRAG_COEFFICIENT_VERTICAL,
+    DRAG_COEFFICIENT_AXIAL,
     ENGINE_THRUST_MAX,
-    ENGINE_THRUST_MIN,
+    ENGINE_THROTTLE_MIN,
     ENGINE_GIMBAL_RANGE,
-    FUEL_FLOW_RATE,
+    ENGINE_MASS_FLOW_MAX,
     PHYSICS_TICK_RATE,
-    MAX_LANDING_VELOCITY,
+    MAX_LANDING_VELOCITY_VERTICAL,
     MAX_LANDING_ANGLE,
     LANDING_PAD_RADIUS,
+    INITIAL_ALTITUDE,
+    INITIAL_VELOCITY_VERTICAL,
+    ROCKET_COM_HEIGHT,
+    ROCKET_MOI_PITCH,
 )
 from .atmosphere import Atmosphere
 
@@ -25,10 +29,10 @@ from .atmosphere import Atmosphere
 class RocketState:
     """Complete state of the rocket."""
     # Position (meters) - x: horizontal, y: vertical (altitude), z: lateral
-    position: np.ndarray = field(default_factory=lambda: np.array([0.0, 5000.0, 0.0]))
+    position: np.ndarray = field(default_factory=lambda: np.array([0.0, INITIAL_ALTITUDE, 0.0]))
     
     # Velocity (m/s)
-    velocity: np.ndarray = field(default_factory=lambda: np.array([0.0, -200.0, 0.0]))
+    velocity: np.ndarray = field(default_factory=lambda: np.array([0.0, INITIAL_VELOCITY_VERTICAL, 0.0]))
     
     # Orientation quaternion (w, x, y, z) - starts upright
     orientation: np.ndarray = field(default_factory=lambda: np.array([1.0, 0.0, 0.0, 0.0]))
@@ -90,7 +94,7 @@ class PhysicsEngine:
         self.state = RocketState()
         self.time = 0.0
     
-    def reset(self, altitude: float = 5000.0, velocity: float = -200.0):
+    def reset(self, altitude: float = INITIAL_ALTITUDE, velocity: float = INITIAL_VELOCITY_VERTICAL):
         """Reset simulation to initial conditions."""
         self.state = RocketState(
             position=np.array([0.0, altitude, 0.0]),
@@ -108,7 +112,7 @@ class PhysicsEngine:
             return np.array([0.0, 0.0, 0.0])
         
         # Effective throttle (minimum 40% when engine is on)
-        effective_throttle = max(self.state.throttle, ENGINE_THRUST_MIN)
+        effective_throttle = max(self.state.throttle, ENGINE_THROTTLE_MIN)
         thrust_magnitude = ENGINE_THRUST_MAX * effective_throttle
         
         # Apply gimbal angles (convert to radians)
@@ -138,11 +142,12 @@ class PhysicsEngine:
         altitude = self.state.position[1]
         density = self.atmosphere.get_density(altitude)
         
-        # Dynamic pressure
+        # Dynamic pressure: q = 0.5 * ρ * v²
         q = 0.5 * density * speed ** 2
         
         # Drag force (opposite to velocity direction)
-        drag_magnitude = q * ROCKET_CROSS_SECTION * DRAG_COEFFICIENT_VERTICAL
+        # F_drag = q * A * Cd
+        drag_magnitude = q * ROCKET_CROSS_SECTION * DRAG_COEFFICIENT_AXIAL
         drag_direction = -velocity / speed
         
         return drag_magnitude * drag_direction
@@ -155,8 +160,9 @@ class PhysicsEngine:
     def consume_fuel(self):
         """Consume fuel based on current throttle."""
         if self.state.throttle > 0 and self.state.fuel > 0:
-            effective_throttle = max(self.state.throttle, ENGINE_THRUST_MIN)
-            fuel_consumption = FUEL_FLOW_RATE * effective_throttle * self.dt
+            effective_throttle = max(self.state.throttle, ENGINE_THROTTLE_MIN)
+            # Mass flow rate proportional to throttle
+            fuel_consumption = ENGINE_MASS_FLOW_MAX * effective_throttle * self.dt
             self.state.fuel = max(0, self.state.fuel - fuel_consumption)
     
     def rotate_vector_by_quaternion(self, v: np.ndarray, q: np.ndarray) -> np.ndarray:
@@ -208,28 +214,24 @@ class PhysicsEngine:
     
     def apply_control_torques(self):
         """Apply torques from gimbal and grid fins for attitude control."""
-        # Simplified torque model
         # Gimbal creates torque proportional to thrust and gimbal angle
         if self.state.throttle > 0 and self.state.fuel > 0:
-            effective_throttle = max(self.state.throttle, ENGINE_THRUST_MIN)
+            effective_throttle = max(self.state.throttle, ENGINE_THROTTLE_MIN)
             thrust = ENGINE_THRUST_MAX * effective_throttle
             
-            # Moment arm (distance from engine to center of mass, roughly)
-            moment_arm = 20.0  # meters
+            # Moment arm (distance from engine to center of mass)
+            moment_arm = ROCKET_COM_HEIGHT
             
-            # Torque from gimbal
+            # Torque from gimbal: τ = F × r
             gimbal_rad = np.radians(self.state.gimbal)
             torque_from_gimbal = np.array([
                 thrust * np.sin(gimbal_rad[0]) * moment_arm * 0.001,  # pitch
-                0.0,  # yaw (from gimbal yaw)
+                0.0,  # yaw
                 thrust * np.sin(gimbal_rad[1]) * moment_arm * 0.001,  # roll
             ])
             
-            # Simple angular acceleration (I = mr², simplified)
-            mass = self.get_mass()
-            moment_of_inertia = mass * 5.0 ** 2  # rough approximation
-            
-            angular_accel = torque_from_gimbal / moment_of_inertia
+            # Angular acceleration: α = τ / I
+            angular_accel = torque_from_gimbal / ROCKET_MOI_PITCH
             self.state.angular_velocity += angular_accel * self.dt
         
         # Damping (simulates natural stability and air resistance to rotation)
@@ -239,8 +241,8 @@ class PhysicsEngine:
     def check_landing(self):
         """Check if rocket has landed or crashed."""
         if self.state.position[1] <= 0:
-            speed = np.linalg.norm(self.state.velocity)
             vertical_speed = abs(self.state.velocity[1])
+            horizontal_speed = np.sqrt(self.state.velocity[0]**2 + self.state.velocity[2]**2)
             horizontal_distance = np.sqrt(self.state.position[0]**2 + self.state.position[2]**2)
             
             # Calculate tilt angle from vertical
@@ -249,7 +251,7 @@ class PhysicsEngine:
             tilt_angle = np.degrees(np.arccos(np.clip(up_world[1], -1, 1)))
             
             # Check landing conditions
-            if (vertical_speed <= MAX_LANDING_VELOCITY and 
+            if (vertical_speed <= MAX_LANDING_VELOCITY_VERTICAL and 
                 tilt_angle <= MAX_LANDING_ANGLE and
                 horizontal_distance <= LANDING_PAD_RADIUS):
                 self.state.landed = True
@@ -276,7 +278,7 @@ class PhysicsEngine:
             self.state.phase = "descent"
         else:
             self.state.phase = "landing_burn"
-            # Auto-deploy legs below 500m
+            # Auto-deploy legs below 200m
             if altitude < 200 and not self.state.legs_deployed:
                 self.state.legs_deployed = True
     
@@ -331,4 +333,3 @@ class PhysicsEngine:
         
         if grid_fins is not None:
             self.state.grid_fins = np.array(grid_fins)
-

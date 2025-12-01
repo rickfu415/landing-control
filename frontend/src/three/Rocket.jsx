@@ -49,6 +49,164 @@ function EngineFlame({ throttle }) {
   )
 }
 
+function VelocityStreaks({ velocity, altitude }) {
+  const streaksRef = useRef()
+  const speed = Math.sqrt(velocity[0]**2 + velocity[1]**2 + velocity[2]**2)
+  
+  // Create streak positions
+  const streakCount = 30
+  const streaks = useMemo(() => {
+    const positions = []
+    for (let i = 0; i < streakCount; i++) {
+      positions.push({
+        x: (Math.random() - 0.5) * 40,
+        y: Math.random() * 60 - 10,
+        z: (Math.random() - 0.5) * 40,
+        speed: 0.5 + Math.random() * 0.5
+      })
+    }
+    return positions
+  }, [])
+  
+  useFrame((state, delta) => {
+    if (streaksRef.current && speed > 30) {
+      streaksRef.current.children.forEach((streak, i) => {
+        // Move streaks based on velocity
+        streak.position.y += velocity[1] * delta * streaks[i].speed * 0.05
+        streak.position.x += velocity[0] * delta * streaks[i].speed * 0.05
+        streak.position.z += velocity[2] * delta * streaks[i].speed * 0.05
+        
+        // Reset position when out of view
+        if (streak.position.y > 80) {
+          streak.position.y = -20
+          streak.position.x = (Math.random() - 0.5) * 40
+          streak.position.z = (Math.random() - 0.5) * 40
+        }
+        if (streak.position.y < -30) {
+          streak.position.y = 60
+          streak.position.x = (Math.random() - 0.5) * 40
+          streak.position.z = (Math.random() - 0.5) * 40
+        }
+      })
+    }
+  })
+  
+  // Only show streaks at high speed
+  if (speed < 30 || altitude < 50) return null
+  
+  // Streak length based on speed
+  const streakLength = Math.min(speed * 0.15, 20)
+  const opacity = Math.min((speed - 30) / 100, 0.6)
+  
+  return (
+    <group ref={streaksRef}>
+      {streaks.map((streak, i) => (
+        <mesh key={i} position={[streak.x, streak.y, streak.z]}>
+          <boxGeometry args={[0.1, streakLength, 0.1]} />
+          <meshBasicMaterial 
+            color="#88ccff" 
+            transparent 
+            opacity={opacity * streak.speed} 
+          />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+function AirParticles({ velocity, altitude }) {
+  const particlesRef = useRef()
+  const speed = Math.sqrt(velocity[0]**2 + velocity[1]**2 + velocity[2]**2)
+  
+  const particleCount = 100
+  const particles = useMemo(() => {
+    const positions = new Float32Array(particleCount * 3)
+    for (let i = 0; i < particleCount; i++) {
+      positions[i * 3] = (Math.random() - 0.5) * 60
+      positions[i * 3 + 1] = Math.random() * 80 - 20
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 60
+    }
+    return positions
+  }, [])
+  
+  useFrame((state, delta) => {
+    if (particlesRef.current && speed > 20) {
+      const positions = particlesRef.current.geometry.attributes.position.array
+      
+      for (let i = 0; i < particleCount; i++) {
+        // Move particles opposite to velocity direction
+        positions[i * 3] += velocity[0] * delta * 0.08
+        positions[i * 3 + 1] += velocity[1] * delta * 0.08
+        positions[i * 3 + 2] += velocity[2] * delta * 0.08
+        
+        // Reset when out of bounds
+        if (positions[i * 3 + 1] > 80 || positions[i * 3 + 1] < -30) {
+          positions[i * 3] = (Math.random() - 0.5) * 60
+          positions[i * 3 + 1] = velocity[1] < 0 ? 60 : -20
+          positions[i * 3 + 2] = (Math.random() - 0.5) * 60
+        }
+      }
+      
+      particlesRef.current.geometry.attributes.position.needsUpdate = true
+    }
+  })
+  
+  if (speed < 20 || altitude < 30) return null
+  
+  const particleSize = Math.min(speed * 0.02, 1.5)
+  const opacity = Math.min((speed - 20) / 150, 0.4)
+  
+  return (
+    <points ref={particlesRef}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          count={particleCount}
+          array={particles}
+          itemSize={3}
+        />
+      </bufferGeometry>
+      <pointsMaterial 
+        color="#aaddff" 
+        size={particleSize} 
+        transparent 
+        opacity={opacity}
+        sizeAttenuation
+      />
+    </points>
+  )
+}
+
+function ReentryGlow({ velocity, altitude }) {
+  const glowRef = useRef()
+  const speed = Math.sqrt(velocity[0]**2 + velocity[1]**2 + velocity[2]**2)
+  
+  useFrame(() => {
+    if (glowRef.current) {
+      // Pulsing glow effect
+      const pulse = 0.8 + Math.sin(Date.now() * 0.01) * 0.2
+      glowRef.current.material.opacity = Math.min((speed - 100) / 200, 0.5) * pulse
+    }
+  })
+  
+  // Only show reentry glow at very high speeds
+  if (speed < 100 || altitude < 100) return null
+  
+  const glowSize = 3 + (speed - 100) * 0.01
+  
+  return (
+    <mesh ref={glowRef} position={[0, -15, 0]}>
+      <sphereGeometry args={[glowSize, 16, 16]} />
+      <meshBasicMaterial 
+        color="#ff4400" 
+        transparent 
+        opacity={0.3}
+        side={THREE.BackSide}
+      />
+    </mesh>
+  )
+}
+
 function LandingLeg({ position, rotation, deployed }) {
   const legRef = useRef()
   const targetAngle = deployed ? Math.PI / 6 : 0
@@ -99,7 +257,7 @@ function Rocket() {
   const rocketRef = useRef()
   const { gameState } = useGameStore()
   
-  const { position, orientation, throttle, legs_deployed } = gameState.rocket
+  const { position, velocity, orientation, throttle, legs_deployed, altitude } = gameState.rocket
   
   // Convert quaternion to Euler for Three.js
   const quaternion = useMemo(() => {
@@ -118,6 +276,11 @@ function Rocket() {
   
   return (
     <group ref={rocketRef}>
+      {/* Velocity-based effects */}
+      <VelocityStreaks velocity={velocity} altitude={altitude} />
+      <AirParticles velocity={velocity} altitude={altitude} />
+      <ReentryGlow velocity={velocity} altitude={altitude} />
+      
       {/* Main body (first stage) */}
       <mesh position={[0, 12, 0]}>
         <cylinderGeometry args={[1.85, 1.85, 40, 32]} />
@@ -189,4 +352,3 @@ function Rocket() {
 }
 
 export default Rocket
-

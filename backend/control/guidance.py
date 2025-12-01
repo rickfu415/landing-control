@@ -7,8 +7,10 @@ from typing import Tuple, Optional
 from physics.constants import (
     GRAVITY,
     ENGINE_THRUST_MAX,
-    ENGINE_THRUST_MIN,
+    ENGINE_THROTTLE_MIN,
     ROCKET_DRY_MASS,
+    SUICIDE_BURN_MARGIN,
+    TERMINAL_VELOCITY_TARGET,
 )
 
 
@@ -44,8 +46,8 @@ class GuidanceSystem:
         This computes the minimum altitude needed to decelerate to zero
         velocity at ground level, assuming constant max thrust.
         """
-        # Available thrust (using minimum throttle that's actually the min when engine is on)
-        thrust = ENGINE_THRUST_MAX * ENGINE_THRUST_MIN  # Use minimum throttle for safety margin
+        # Available thrust at minimum throttle (conservative)
+        thrust = ENGINE_THRUST_MAX * ENGINE_THROTTLE_MIN
         
         # Net deceleration (thrust - gravity)
         decel = (thrust / mass) - GRAVITY
@@ -58,8 +60,8 @@ class GuidanceSystem:
         # We want v = 0, so: s = v₀² / (2 * decel)
         burn_distance = (velocity ** 2) / (2 * decel)
         
-        # Add safety margin (10%)
-        return burn_distance * 1.1
+        # Add safety margin
+        return burn_distance * SUICIDE_BURN_MARGIN
     
     def compute_command(self, position: np.ndarray, velocity: np.ndarray,
                         orientation: np.ndarray, fuel: float,
@@ -123,29 +125,20 @@ class GuidanceSystem:
                                descent_speed: float, horizontal_speed: float) -> GuidanceCommand:
         """Compute commands during landing burn."""
         
-        # Target: zero velocity at zero altitude
-        # Simple proportional guidance for now
-        
-        # Vertical guidance - compute required throttle
-        # We want to achieve zero velocity at ground level
-        
-        # Current kinetic + potential energy that needs to be dissipated
-        # Using a simple feedback law
-        
-        # Desired vertical deceleration
+        # Desired vertical deceleration profile
         if altitude > 10:
             # Target velocity profile: v = -k * sqrt(altitude)
-            # This gives constant deceleration
+            # This gives approximately constant deceleration
             target_descent_speed = 2.0 * np.sqrt(altitude)
             target_descent_speed = min(target_descent_speed, 100)  # Cap at 100 m/s
         else:
             # Final approach - very slow
-            target_descent_speed = 1.0
+            target_descent_speed = TERMINAL_VELOCITY_TARGET
         
         # Velocity error
         velocity_error = target_descent_speed - descent_speed
         
-        # Compute required thrust
+        # Compute required thrust using feedback control
         # F = m * (g + desired_decel)
         desired_decel = -velocity_error * 0.5  # P controller
         required_thrust = mass * (GRAVITY + desired_decel)
@@ -154,17 +147,13 @@ class GuidanceSystem:
         throttle = required_thrust / ENGINE_THRUST_MAX
         throttle = np.clip(throttle, 0.0, 1.0)
         
-        # If we need thrust but it's below minimum, decide whether to pulse or not
-        if 0 < throttle < ENGINE_THRUST_MIN:
-            # We need less thrust than minimum - this is the "hover problem"
-            # For now, just use minimum throttle
-            throttle = ENGINE_THRUST_MIN
+        # If we need thrust but it's below minimum, use minimum
+        if 0 < throttle < ENGINE_THROTTLE_MIN:
+            throttle = ENGINE_THROTTLE_MIN
         
         # Horizontal guidance - steer toward landing pad
         horizontal_offset = self.target_position - position
         horizontal_offset[1] = 0  # Only horizontal components
-        
-        horizontal_distance = np.linalg.norm(horizontal_offset[[0, 2]])
         
         # Compute desired gimbal to cancel horizontal velocity and move toward pad
         if throttle > 0 and altitude > 5:
@@ -176,9 +165,6 @@ class GuidanceSystem:
             desired_horizontal_accel = -k1 * velocity[[0, 2]] + k2 * horizontal_offset[[0, 2]]
             
             # Gimbal angles needed (small angle approximation)
-            # horizontal_accel ≈ g * gimbal_angle (when hovering)
-            max_horizontal_accel = (ENGINE_THRUST_MAX * throttle / mass) * np.sin(np.radians(5))
-            
             gimbal_pitch = np.degrees(np.arcsin(np.clip(
                 desired_horizontal_accel[0] * mass / (ENGINE_THRUST_MAX * throttle + 1),
                 -1, 1

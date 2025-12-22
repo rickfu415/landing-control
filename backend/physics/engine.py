@@ -23,6 +23,12 @@ from .constants import (
     ROCKET_MOI_PITCH,
 )
 from .atmosphere import Atmosphere
+from .geometry import RocketGeometry, RocketConfig
+from .rigid_body import RigidBodyDynamics, RigidBodyState
+from .wind import WindModel, WindConfig
+from .aerodynamics import AerodynamicsModel
+from .torques import TorqueCalculator
+from .transformations import world_to_body, body_to_world
 
 
 @dataclass
@@ -62,9 +68,9 @@ class RocketState:
     landed: bool = False
     crashed: bool = False
     
-    def to_dict(self) -> dict:
+    def to_dict(self, geometry: RocketGeometry = None, aerodynamics_model = None) -> dict:
         """Convert state to dictionary for JSON serialization."""
-        return {
+        result = {
             "position": self.position.tolist(),
             "velocity": self.velocity.tolist(),
             "orientation": self.orientation.tolist(),
@@ -83,16 +89,67 @@ class RocketState:
             "horizontal_speed": float(np.sqrt(self.velocity[0]**2 + self.velocity[2]**2)),
             "mass": ROCKET_DRY_MASS + self.fuel,
         }
+        
+        # Add geometry information if available
+        if geometry:
+            result["geometry"] = {
+                "height": geometry.config.height,
+                "diameter": geometry.config.diameter,
+                "radius": geometry.radius,
+                "cross_sectional_area": geometry.cross_sectional_area,
+            }
+        
+        # Add terminal velocity information
+        if aerodynamics_model and geometry:
+            try:
+                mass = geometry.get_mass(self.fuel)
+                area = geometry.cross_sectional_area
+                altitude = self.position[1]
+                v_term_axial, v_term_normal = aerodynamics_model.calculate_terminal_velocity_range(
+                    mass, area, altitude
+                )
+                result["terminal_velocity"] = {
+                    "axial": v_term_axial,
+                    "normal": v_term_normal,
+                }
+            except Exception:
+                # If calculation fails, skip it
+                pass
+        
+        return result
 
 
 class PhysicsEngine:
     """Main physics simulation engine."""
     
-    def __init__(self):
+    def __init__(self, rocket_config: RocketConfig = None, wind_config: WindConfig = None, use_6dof: bool = True):
         self.dt = 1.0 / PHYSICS_TICK_RATE
         self.atmosphere = Atmosphere()
+        self.geometry = RocketGeometry(config=rocket_config)
+        self.wind = WindModel(config=wind_config)
+        self.aerodynamics = AerodynamicsModel()
+        self.dynamics = RigidBodyDynamics(geometry=self.geometry)
+        self.torque_calculator = TorqueCalculator(geometry=self.geometry)
         self.state = RocketState()
         self.time = 0.0
+        self.use_6dof = use_6dof  # Flag to enable/disable 6-DOF solver
+    
+    def get_terminal_velocity(self, orientation: str = "axial") -> float:
+        """
+        Get terminal velocity at current altitude and mass.
+        
+        Args:
+            orientation: "axial" or "normal"
+            
+        Returns:
+            Terminal velocity in m/s
+        """
+        mass = self.get_mass()
+        area = self.geometry.cross_sectional_area
+        altitude = self.state.position[1]
+        return self.aerodynamics.calculate_terminal_velocity(
+            mass, area, altitude, orientation=orientation
+        )
     
     def reset(self, altitude: float = INITIAL_ALTITUDE, velocity: float = INITIAL_VELOCITY_VERTICAL):
         """Reset simulation to initial conditions."""
@@ -101,10 +158,11 @@ class PhysicsEngine:
             velocity=np.array([0.0, velocity, 0.0]),
         )
         self.time = 0.0
+        self.wind.reset()
     
     def get_mass(self) -> float:
         """Get current total mass of rocket."""
-        return ROCKET_DRY_MASS + self.state.fuel
+        return self.geometry.get_mass(self.state.fuel)
     
     def get_thrust_vector(self) -> np.ndarray:
         """Calculate thrust vector based on throttle and gimbal."""
@@ -119,15 +177,29 @@ class PhysicsEngine:
         gimbal_pitch = np.radians(np.clip(self.state.gimbal[0], -ENGINE_GIMBAL_RANGE, ENGINE_GIMBAL_RANGE))
         gimbal_yaw = np.radians(np.clip(self.state.gimbal[1], -ENGINE_GIMBAL_RANGE, ENGINE_GIMBAL_RANGE))
         
-        # Thrust vector in body frame (engine points down, thrust is up)
+        # Thrust vector in body frame
+        # Body frame: x=forward (nose), y=right, z=up
+        # World frame: x=horizontal (east), y=vertical (up), z=horizontal (north)
+        # Thrust points upward (+z in body frame) when gimbal is zero
+        # Gimbal pitch rotates thrust in x-z plane (forward/backward)
+        # Gimbal yaw rotates thrust in y-z plane (left/right)
         thrust_body = np.array([
-            thrust_magnitude * np.sin(gimbal_pitch),
-            thrust_magnitude * np.cos(gimbal_pitch) * np.cos(gimbal_yaw),
-            thrust_magnitude * np.sin(gimbal_yaw),
+            thrust_magnitude * np.sin(gimbal_pitch),  # x: forward/backward component
+            thrust_magnitude * np.sin(gimbal_yaw),     # y: left/right component
+            thrust_magnitude * np.cos(gimbal_pitch) * np.cos(gimbal_yaw),  # z: upward component
         ])
         
-        # Rotate to world frame using orientation quaternion
+        # Transform to world frame using orientation quaternion
         thrust_world = self.rotate_vector_by_quaternion(thrust_body, self.state.orientation)
+        
+        # Coordinate system fix: Body frame z (up) should map to world frame y (vertical)
+        # When upright, quaternion rotation maps body z → world z, but we need body z → world y
+        # Swap y and z components AFTER rotation to fix coordinate system mismatch
+        thrust_world = np.array([
+            thrust_world[0],  # x stays x
+            thrust_world[2],  # world z → world y (vertical)
+            thrust_world[1],  # world y → world z (horizontal)
+        ])
         
         return thrust_world
     
@@ -147,7 +219,7 @@ class PhysicsEngine:
         
         # Drag force (opposite to velocity direction)
         # F_drag = q * A * Cd
-        drag_magnitude = q * ROCKET_CROSS_SECTION * DRAG_COEFFICIENT_AXIAL
+        drag_magnitude = q * self.geometry.cross_sectional_area * DRAG_COEFFICIENT_AXIAL
         drag_direction = -velocity / speed
         
         return drag_magnitude * drag_direction
@@ -284,6 +356,13 @@ class PhysicsEngine:
     
     def step(self) -> RocketState:
         """Advance simulation by one time step."""
+        if self.use_6dof:
+            return self.step_6dof()
+        else:
+            return self.step_simple()
+    
+    def step_simple(self) -> RocketState:
+        """Simple physics step (original implementation)."""
         if self.state.landed or self.state.crashed:
             return self.state
         
@@ -305,6 +384,110 @@ class PhysicsEngine:
         # Update orientation
         self.apply_control_torques()
         self.update_orientation()
+        
+        # Consume fuel
+        self.consume_fuel()
+        
+        # Update phase
+        self.update_phase()
+        
+        # Check for landing/crash
+        self.check_landing()
+        
+        self.time += self.dt
+        
+        return self.state
+    
+    def step_6dof(self) -> RocketState:
+        """6-DOF physics step using RigidBodyDynamics solver."""
+        if self.state.landed or self.state.crashed:
+            return self.state
+        
+        # Update wind model time
+        self.wind.update_time(self.dt)
+        
+        # Create rigid body state
+        rb_state = RigidBodyState(
+            position=self.state.position.copy(),
+            velocity=self.state.velocity.copy(),
+            orientation=self.state.orientation.copy(),
+            angular_velocity=self.state.angular_velocity.copy(),
+        )
+        
+        # Calculate forces in world frame
+        gravity = self.get_gravity_force()
+        thrust_world = self.get_thrust_vector()
+        
+        # Calculate aerodynamic forces in body frame
+        # Get relative velocity (rocket - wind)
+        relative_velocity_world = self.wind.get_relative_velocity(
+            self.state.velocity,
+            self.state.position[1]
+        )
+        
+        # Transform to body frame
+        relative_velocity_body = world_to_body(relative_velocity_world, self.state.orientation)
+        
+        # Compute aerodynamic forces in body frame
+        aero_force_body = self.aerodynamics.compute_aerodynamic_forces(
+            relative_velocity_body,
+            self.state.position[1],
+            self.geometry.cross_sectional_area
+        )
+        
+        # Transform aerodynamic forces to world frame
+        aero_force_world = body_to_world(aero_force_body, self.state.orientation)
+        
+        # When falling straight down with no horizontal velocity, ensure drag is purely vertical
+        # to prevent numerical errors from creating horizontal forces
+        horizontal_velocity_mag = np.sqrt(self.state.velocity[0]**2 + self.state.velocity[2]**2)
+        if horizontal_velocity_mag < 0.1:  # Less than 0.1 m/s horizontal velocity
+            # Force drag to be purely vertical (y-direction only)
+            aero_force_world = np.array([0.0, aero_force_world[1], 0.0])
+        
+        # Total forces in world frame
+        total_force_world = gravity + thrust_world + aero_force_world
+        
+        # Calculate torques in body frame
+        # Thrust vector in body frame (for torque calculation)
+        if self.state.throttle > 0 and self.state.fuel > 0:
+            effective_throttle = max(self.state.throttle, ENGINE_THROTTLE_MIN)
+            thrust_magnitude = ENGINE_THRUST_MAX * effective_throttle
+            gimbal_pitch = np.radians(np.clip(self.state.gimbal[0], -ENGINE_GIMBAL_RANGE, ENGINE_GIMBAL_RANGE))
+            gimbal_yaw = np.radians(np.clip(self.state.gimbal[1], -ENGINE_GIMBAL_RANGE, ENGINE_GIMBAL_RANGE))
+            # Thrust vector in body frame (same as in get_thrust_vector)
+            # Body frame: x=forward, y=right, z=up
+            thrust_body = np.array([
+                thrust_magnitude * np.sin(gimbal_pitch),  # x: forward/backward
+                thrust_magnitude * np.sin(gimbal_yaw),     # y: left/right
+                thrust_magnitude * np.cos(gimbal_pitch) * np.cos(gimbal_yaw),  # z: upward
+            ])
+        else:
+            thrust_body = np.zeros(3)
+        
+        # Compute total torque
+        total_torque_body = self.torque_calculator.compute_total_torque(
+            thrust_body=thrust_body,
+            aero_force_body=aero_force_body,
+            angular_velocity_body=self.state.angular_velocity,
+            fuel_remaining=self.state.fuel,
+            include_damping=True
+        )
+        
+        # Integrate using 6-DOF solver
+        new_rb_state = self.dynamics.integrate(
+            state=rb_state,
+            forces_world=total_force_world,
+            torques_body=total_torque_body,
+            fuel_remaining=self.state.fuel,
+            dt=self.dt
+        )
+        
+        # Update rocket state
+        self.state.position = new_rb_state.position
+        self.state.velocity = new_rb_state.velocity
+        self.state.orientation = new_rb_state.orientation
+        self.state.angular_velocity = new_rb_state.angular_velocity
         
         # Consume fuel
         self.consume_fuel()

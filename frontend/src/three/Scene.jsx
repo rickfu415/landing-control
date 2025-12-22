@@ -220,8 +220,9 @@ function CameraController() {
   const prevRocketPos = useRef(new THREE.Vector3(0, 5000, 0))
   const initialized = useRef(false)
   
-  // Rocket center is at approximately 12m from bottom (half of 47.7m height, adjusted)
-  const ROCKET_CENTER_OFFSET = 12  // meters from position (which is at engine)
+  // Rocket center is at half height from bottom (position is at engine)
+  const rocketHeight = gameState.rocket.geometry?.height || 47.7
+  const ROCKET_CENTER_OFFSET = rocketHeight / 2  // meters from position (which is at engine)
   
   // Initialize camera position on mount
   useEffect(() => {

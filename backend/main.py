@@ -27,6 +27,7 @@ class CreateGameRequest(BaseModel):
     mode: str = "manual"
     initial_altitude: float = 5000.0
     initial_velocity: float = -200.0
+    wind_level: int = 0  # Beaufort scale level (1-9), 0 = no wind (default)
 
 
 class GameInputRequest(BaseModel):
@@ -102,10 +103,16 @@ async def create_game(request: CreateGameRequest):
         "assisted": GameMode.ASSISTED,
     }
     
+    # Validate wind level
+    wind_level = request.wind_level
+    if wind_level < 0 or wind_level > 9:
+        wind_level = 0  # Default to no wind if invalid
+    
     config = GameConfig(
         mode=mode_map.get(request.mode, GameMode.MANUAL),
         initial_altitude=request.initial_altitude,
         initial_velocity=request.initial_velocity,
+        wind_level=wind_level,
     )
     
     session = GameSession(session_id, config)
@@ -117,6 +124,7 @@ async def create_game(request: CreateGameRequest):
             "mode": request.mode,
             "initial_altitude": request.initial_altitude,
             "initial_velocity": request.initial_velocity,
+            "wind_level": wind_level,
         }
     }
 
@@ -241,15 +249,33 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             elif data["type"] == "config":
                 # Update game configuration
                 mode = data.get("mode", "manual")
+                wind_level = data.get("wind_level")
+                
                 mode_map = {
                     "manual": GameMode.MANUAL,
                     "autonomous": GameMode.AUTONOMOUS,
                     "assisted": GameMode.ASSISTED,
                 }
                 sessions[session_id].config.mode = mode_map.get(mode, GameMode.MANUAL)
+                
+                if wind_level is not None:
+                    # Validate and set wind level
+                    wind_level = max(0, min(9, int(wind_level)))
+                    sessions[session_id].config.wind_level = wind_level
+                    # Reinitialize wind model with new config
+                    from physics.wind import WindConfig
+                    wind_config = WindConfig(
+                        enabled=(wind_level > 0),
+                        wind_level=wind_level if wind_level > 0 else 1,  # Use 1 as placeholder if disabled
+                        turbulence_strength=0.3,
+                        seed=None
+                    )
+                    sessions[session_id].physics.wind = WindModel(config=wind_config)
+                
                 await websocket.send_json({
                     "type": "config_updated",
-                    "mode": mode
+                    "mode": mode,
+                    "wind_level": sessions[session_id].config.wind_level
                 })
     
     except WebSocketDisconnect:

@@ -38,6 +38,12 @@ const useGameStore = create((set, get) => ({
       landed: false,
       crashed: false,
       legs_deployed: false,
+      geometry: {
+        height: 47.7,
+        diameter: 3.66,
+        radius: 1.83,
+        cross_sectional_area: 10.52,
+      },
     }
   },
   

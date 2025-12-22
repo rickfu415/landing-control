@@ -22,8 +22,7 @@ class GameConfig:
     mode: GameMode = GameMode.MANUAL
     initial_altitude: float = 5000.0
     initial_velocity: float = -200.0
-    wind_enabled: bool = False
-    wind_speed: float = 0.0
+    wind_level: int = 0  # Beaufort scale level (1-9), 0 = no wind (default)
 
 
 class GameSession:
@@ -36,8 +35,19 @@ class GameSession:
         self.session_id = session_id
         self.config = config or GameConfig()
         
+        # Initialize wind configuration
+        from physics.wind import WindConfig
+        # Clamp wind level to 0-9 (0 = disabled, 1-9 = Beaufort scale)
+        clamped_wind_level = max(0, min(9, self.config.wind_level))
+        wind_config = WindConfig(
+            enabled=(clamped_wind_level > 0),
+            wind_level=clamped_wind_level if clamped_wind_level > 0 else 1,  # Use 1 as placeholder if disabled
+            turbulence_strength=0.3,
+            seed=None  # Random seed for each run (different each time)
+        )
+        
         # Initialize subsystems
-        self.physics = PhysicsEngine()
+        self.physics = PhysicsEngine(wind_config=wind_config)
         self.guidance = None  # Lazy load to avoid circular import
         
         # Game state
@@ -167,7 +177,10 @@ class GameSession:
     
     def get_state(self) -> dict:
         """Get current game state as dictionary."""
-        rocket_state = self.physics.state.to_dict()
+        rocket_state = self.physics.state.to_dict(
+            geometry=self.physics.geometry,
+            aerodynamics_model=self.physics.aerodynamics
+        )
         
         return {
             "session_id": self.session_id,

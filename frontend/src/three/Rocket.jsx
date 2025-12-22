@@ -257,7 +257,16 @@ function Rocket() {
   const rocketRef = useRef()
   const { gameState } = useGameStore()
   
-  const { position, velocity, orientation, throttle, legs_deployed, altitude } = gameState.rocket
+  const { position, velocity, orientation, throttle, legs_deployed, altitude, geometry } = gameState.rocket
+  
+  // Get rocket dimensions from geometry (with defaults for backward compatibility)
+  const rocketHeight = geometry?.height || 47.7
+  const rocketRadius = geometry?.radius || 1.83  // diameter/2 = 3.66/2
+  const rocketDiameter = geometry?.diameter || 3.66
+  
+  // Calculate component positions relative to rocket center
+  // Rocket position is at engine (bottom), so center is at height/2
+  const rocketCenter = rocketHeight / 2
   
   // Convert quaternion to Euler for Three.js
   const quaternion = useMemo(() => {
@@ -282,8 +291,8 @@ function Rocket() {
       <ReentryGlow velocity={velocity} altitude={altitude} />
       
       {/* Main body (first stage) */}
-      <mesh position={[0, 12, 0]}>
-        <cylinderGeometry args={[1.85, 1.85, 40, 32]} />
+      <mesh position={[0, rocketCenter, 0]}>
+        <cylinderGeometry args={[rocketRadius, rocketRadius, rocketHeight, 32]} />
         <meshStandardMaterial 
           color="#e8e8e8" 
           metalness={0.6} 
@@ -291,60 +300,60 @@ function Rocket() {
         />
       </mesh>
       
-      {/* Interstage (black band) */}
-      <mesh position={[0, 30, 0]}>
-        <cylinderGeometry args={[1.9, 1.9, 4, 32]} />
+      {/* Interstage (black band) - positioned near top */}
+      <mesh position={[0, rocketHeight * 0.63, 0]}>
+        <cylinderGeometry args={[rocketRadius * 1.03, rocketRadius * 1.03, rocketHeight * 0.084, 32]} />
         <meshStandardMaterial color="#222222" metalness={0.3} roughness={0.7} />
       </mesh>
       
-      {/* Engine section */}
-      <mesh position={[0, -6, 0]}>
-        <cylinderGeometry args={[1.85, 2.2, 6, 32]} />
+      {/* Engine section - wider at bottom */}
+      <mesh position={[0, rocketHeight * -0.126, 0]}>
+        <cylinderGeometry args={[rocketRadius, rocketRadius * 1.2, rocketHeight * 0.126, 32]} />
         <meshStandardMaterial color="#333333" metalness={0.8} roughness={0.2} />
       </mesh>
       
       {/* Engine nozzle */}
-      <mesh position={[0, -10, 0]}>
-        <cylinderGeometry args={[1, 1.5, 3, 16]} />
+      <mesh position={[0, rocketHeight * -0.21, 0]}>
+        <cylinderGeometry args={[rocketRadius * 0.55, rocketRadius * 0.82, rocketHeight * 0.063, 16]} />
         <meshStandardMaterial color="#222222" metalness={0.9} roughness={0.1} />
       </mesh>
       
       {/* SpaceX-style logo area (black) */}
-      <mesh position={[0, 20, 1.9]}>
-        <boxGeometry args={[2, 8, 0.1]} />
+      <mesh position={[0, rocketHeight * 0.42, rocketRadius * 1.04]}>
+        <boxGeometry args={[rocketDiameter * 0.55, rocketHeight * 0.168, 0.1]} />
         <meshStandardMaterial color="#111111" />
       </mesh>
       
-      {/* Grid fins */}
-      <GridFin position={[2.2, 28, 0]} />
-      <GridFin position={[-2.2, 28, 0]} />
-      <GridFin position={[0, 28, 2.2]} />
-      <GridFin position={[0, 28, -2.2]} />
+      {/* Grid fins - positioned near top */}
+      <GridFin position={[rocketRadius * 1.2, rocketHeight * 0.587, 0]} />
+      <GridFin position={[-rocketRadius * 1.2, rocketHeight * 0.587, 0]} />
+      <GridFin position={[0, rocketHeight * 0.587, rocketRadius * 1.2]} />
+      <GridFin position={[0, rocketHeight * 0.587, -rocketRadius * 1.2]} />
       
-      {/* Landing legs (4 legs) */}
+      {/* Landing legs (4 legs) - positioned at bottom */}
       <LandingLeg 
-        position={[1.8, -5, 0]} 
+        position={[rocketRadius * 0.98, rocketHeight * -0.105, 0]} 
         rotation={[0, 0, 0]} 
         deployed={legs_deployed} 
       />
       <LandingLeg 
-        position={[-1.8, -5, 0]} 
+        position={[-rocketRadius * 0.98, rocketHeight * -0.105, 0]} 
         rotation={[0, Math.PI, 0]} 
         deployed={legs_deployed} 
       />
       <LandingLeg 
-        position={[0, -5, 1.8]} 
+        position={[0, rocketHeight * -0.105, rocketRadius * 0.98]} 
         rotation={[0, -Math.PI/2, 0]} 
         deployed={legs_deployed} 
       />
       <LandingLeg 
-        position={[0, -5, -1.8]} 
+        position={[0, rocketHeight * -0.105, -rocketRadius * 0.98]} 
         rotation={[0, Math.PI/2, 0]} 
         deployed={legs_deployed} 
       />
       
       {/* Engine flame */}
-      <group position={[0, -11, 0]}>
+      <group position={[0, rocketHeight * -0.23, 0]}>
         <EngineFlame throttle={throttle} />
       </group>
     </group>

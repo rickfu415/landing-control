@@ -1,5 +1,7 @@
 import { useEffect, useCallback } from 'react'
 import useGameStore from '../stores/gameStore'
+import useLanguageStore from '../stores/languageStore'
+import { useTranslation } from '../i18n/translations'
 
 function Controls() {
   const { 
@@ -12,6 +14,8 @@ function Controls() {
     resetGame,
     showMenu
   } = useGameStore()
+  const { language } = useLanguageStore()
+  const t = useTranslation(language)
   
   const { running, paused } = gameState
   const isGameOver = gameState.rocket.landed || gameState.rocket.crashed
@@ -86,7 +90,7 @@ function Controls() {
     }
   }, [handleKeyDown, handleKeyUp])
   
-  if (!running || isGameOver || showMenu) return null
+  if (!running || isGameOver) return null
   
   return (
     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-auto">
@@ -94,14 +98,14 @@ function Controls() {
         {/* Throttle control */}
         <div className="flex items-center gap-4">
           <div className="text-center">
-            <label className="text-xs text-gray-400 block mb-2 uppercase tracking-wider">Throttle</label>
+            <label className="text-xs text-gray-400 block mb-2 uppercase tracking-wider">{t.controls.throttle}</label>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setThrottle(0)}
                 className="w-10 h-10 rounded bg-red-900/50 border border-red-500/50 text-red-400 
                          hover:bg-red-800/50 transition-colors text-xs font-bold"
               >
-                CUT
+                {t.controls.cut}
               </button>
               <div className="relative w-32">
                 <input
@@ -125,7 +129,7 @@ function Controls() {
                 className="w-10 h-10 rounded bg-green-900/50 border border-green-500/50 text-green-400 
                          hover:bg-green-800/50 transition-colors text-xs font-bold"
               >
-                MAX
+                {t.controls.max}
               </button>
             </div>
           </div>
@@ -136,7 +140,7 @@ function Controls() {
         
         {/* Gimbal controls */}
         <div className="text-center">
-          <label className="text-xs text-gray-400 block mb-2 uppercase tracking-wider">Gimbal</label>
+          <label className="text-xs text-gray-400 block mb-2 uppercase tracking-wider">{t.controls.gimbal}</label>
           <div className="grid grid-cols-3 gap-1">
             <div></div>
             <button
@@ -196,14 +200,14 @@ function Controls() {
                         ? 'bg-green-600 hover:bg-green-500 text-white' 
                         : 'bg-yellow-600 hover:bg-yellow-500 text-black'}`}
           >
-            {paused ? '▶ Resume' : '⏸ Pause'}
+            {paused ? t.controls.resume : t.controls.pause}
           </button>
           <button
             onClick={resetGame}
             className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600 text-white 
                      font-display font-bold text-sm uppercase tracking-wider transition-colors"
           >
-            ↺ Reset
+            {t.controls.reset}
           </button>
         </div>
         
@@ -212,10 +216,10 @@ function Controls() {
         
         {/* Keyboard hints */}
         <div className="text-[10px] text-gray-500 space-y-0.5">
-          <div>W/S: Throttle</div>
-          <div>A/D/Q/E: Gimbal</div>
-          <div>SPACE: Full | X: Cut</div>
-          <div>P: Pause | R: Reset</div>
+          <div>{t.controls.hints.throttle}</div>
+          <div>{t.controls.hints.gimbal}</div>
+          <div>{t.controls.hints.throttleKeys}</div>
+          <div>{t.controls.hints.gameKeys}</div>
         </div>
       </div>
     </div>

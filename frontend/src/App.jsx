@@ -1,14 +1,19 @@
 import { useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
 import useGameStore from './stores/gameStore'
+import useLanguageStore from './stores/languageStore'
+import { useTranslation } from './i18n/translations'
 import Scene from './three/Scene'
 import HUD from './components/HUD'
 import Controls from './components/Controls'
 import Menu from './components/Menu'
 import GameOver from './components/GameOver'
+import LanguageSelector from './components/LanguageSelector'
 
 function App() {
   const { connect, connected, gameState, showMenu } = useGameStore()
+  const { language } = useLanguageStore()
+  const t = useTranslation(language)
   
   useEffect(() => {
     connect()
@@ -26,6 +31,9 @@ function App() {
         <Scene />
       </Canvas>
       
+      {/* Language Selector */}
+      <LanguageSelector />
+      
       {/* HUD Overlay */}
       <HUD />
       
@@ -36,7 +44,7 @@ function App() {
       {!connected && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-900/80 px-4 py-2 rounded-lg border border-red-500">
           <span className="text-red-300 font-mono text-sm">
-            ⚠ Connecting to server...
+            {t.connection.connecting}
           </span>
         </div>
       )}

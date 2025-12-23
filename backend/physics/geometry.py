@@ -20,13 +20,16 @@ from .constants import (
 
 @dataclass
 class RocketConfig:
-    """Configuration for rocket geometry."""
+    """Configuration for rocket geometry and engine."""
     height: float = ROCKET_HEIGHT  # meters
     diameter: float = ROCKET_DIAMETER  # meters
     dry_mass: float = ROCKET_DRY_MASS  # kg
     fuel_mass: float = ROCKET_FUEL_MASS  # kg
     com_height: float = ROCKET_COM_HEIGHT  # meters from bottom (dry mass COM)
     fuel_com_height: Optional[float] = None  # meters from bottom (fuel COM, defaults to height/2)
+    # Engine parameters
+    thrust: float = 845_000  # N (default: Merlin 1D thrust)
+    isp: float = 282  # seconds (default: Merlin 1D ISP at sea level)
 
 
 class RocketGeometry:
@@ -234,6 +237,100 @@ class RocketGeometry:
 
 
 # =============================================================================
+# TERMINAL VELOCITY AND FUEL CALCULATION HELPERS
+# =============================================================================
+
+def calculate_terminal_velocity(total_mass: float, diameter: float, altitude: float = 5000.0) -> float:
+    """
+    Calculate terminal velocity for a rocket at given altitude.
+    
+    Terminal velocity: v_term = sqrt(2 * m * g / (ρ * A * Cd))
+    
+    Args:
+        total_mass: Total rocket mass (dry + fuel) in kg
+        diameter: Rocket diameter in meters
+        altitude: Altitude in meters (default 5000m for initial conditions)
+        
+    Returns:
+        Terminal velocity in m/s (negative for downward)
+    """
+    GRAVITY = 9.80665  # m/s²
+    SEA_LEVEL_DENSITY = 1.225  # kg/m³
+    SEA_LEVEL_TEMP = 288.15  # K
+    TEMP_LAPSE = 0.0065  # K/m
+    Cd = 0.6  # Drag coefficient (axial, subsonic, cylindrical body)
+    
+    # Atmospheric density at altitude (simplified ISA model)
+    temp_at_alt = SEA_LEVEL_TEMP - TEMP_LAPSE * altitude
+    density = SEA_LEVEL_DENSITY * (temp_at_alt / SEA_LEVEL_TEMP) ** 4.256
+    
+    # Cross-sectional area
+    area = math.pi * (diameter / 2) ** 2
+    
+    # Terminal velocity formula
+    v_term = math.sqrt(2 * total_mass * GRAVITY / (density * area * Cd))
+    
+    return v_term
+
+
+def calculate_landing_fuel(dry_mass: float, thrust_kn: float, isp: float, diameter: float, safety_margin: float = 1.10) -> float:
+    """
+    Calculate optimal landing fuel based on rocket parameters and terminal velocity.
+    
+    Accounts for:
+    - Terminal velocity at starting altitude (5000m)
+    - Gravity losses during burn
+    - Changing mass during burn
+    - Configurable safety margin (default 10% extra)
+    
+    Args:
+        dry_mass: Rocket dry mass in kg
+        thrust_kn: Engine thrust in kilonewtons
+        isp: Specific impulse in seconds
+        diameter: Rocket diameter in meters
+        safety_margin: Safety margin multiplier (default 1.10 = 10% extra)
+        
+    Returns:
+        Optimal landing fuel in kg (rounded to nearest 100 kg)
+    """
+    GRAVITY = 9.80665  # m/s²
+    INITIAL_ALTITUDE = 5000.0  # meters
+    
+    # Convert thrust to Newtons
+    thrust_n = thrust_kn * 1000
+    
+    # Calculate mass flow rate (kg/s)
+    mass_flow_rate = thrust_n / (isp * GRAVITY)
+    
+    # Iteratively calculate fuel needed (converges in ~5-10 iterations)
+    # Start with an initial guess
+    fuel_needed = 1000  # kg initial guess
+    
+    for _ in range(15):  # More iterations for convergence
+        # Total mass at start (with fuel)
+        total_mass = dry_mass + fuel_needed
+        
+        # Calculate terminal velocity at starting altitude
+        terminal_velocity = calculate_terminal_velocity(total_mass, diameter, altitude=INITIAL_ALTITUDE)
+        
+        # Average mass during burn (starts with fuel, ends with ~0 fuel)
+        avg_mass = dry_mass + (fuel_needed / 2)
+        
+        # Net acceleration (thrust - gravity)
+        avg_accel = (thrust_n / avg_mass) - GRAVITY
+        
+        # Burn time to kill terminal velocity
+        burn_time = terminal_velocity / avg_accel
+        
+        # Fuel consumed
+        fuel_needed = mass_flow_rate * burn_time
+    
+    # Add safety margin and round to nearest 100 kg
+    fuel_with_margin = fuel_needed * safety_margin
+    return round(fuel_with_margin / 100) * 100
+
+
+# =============================================================================
 # PREDEFINED ROCKET MODELS
 # =============================================================================
 
@@ -246,35 +343,25 @@ class RocketPresets:
     """
     
     @staticmethod
-    def falcon9_block5() -> RocketConfig:
-        """
-        SpaceX Falcon 9 Block 5 First Stage.
-        
-        Sources: SpaceX official data, Wikipedia
-        """
-        return RocketConfig(
-            height=47.7,  # First stage height
-            diameter=3.66,  # meters
-            dry_mass=22_200,  # kg (first stage dry mass)
-            fuel_mass=411_000,  # kg (RP-1 + LOX propellant)
-            com_height=20.0,  # meters from bottom (estimated)
-            fuel_com_height=23.85,  # meters (center of fuel tank)
-        )
-    
-    @staticmethod
     def falcon9_block5_landing() -> RocketConfig:
         """
         SpaceX Falcon 9 Block 5 First Stage (Landing Configuration).
         
-        Reduced fuel for landing simulation (challenging gameplay).
+        Fuel calculated for optimal landing from 5000m @ terminal velocity + 10% margin.
         """
+        dry_mass = 22_200
+        diameter = 3.66
+        thrust_kn = 845
+        isp = 282
         return RocketConfig(
             height=47.7,
-            diameter=3.66,
-            dry_mass=22_200,
-            fuel_mass=3_000,  # Limited landing fuel
+            diameter=diameter,
+            dry_mass=dry_mass,
+            fuel_mass=calculate_landing_fuel(dry_mass, thrust_kn, isp, diameter),
             com_height=20.0,
             fuel_com_height=23.85,
+            thrust=thrust_kn * 1000,  # Convert kN to N
+            isp=isp,
         )
     
     @staticmethod
@@ -283,14 +370,22 @@ class RocketPresets:
         SpaceX Starship Super Heavy Booster (First Stage).
         
         Sources: SpaceX official data
+        Fuel calculated for landing scenario from terminal velocity + 10% margin.
+        Uses 3 Raptor engines for landing (similar to Falcon 9 using 1 of 9).
         """
+        dry_mass = 200_000
+        diameter = 9.0
+        thrust_kn = 6900  # 3× Raptor engines (2,300 kN each)
+        isp = 330
         return RocketConfig(
             height=69.0,  # Super Heavy booster height
-            diameter=9.0,  # meters
-            dry_mass=200_000,  # kg (estimated dry mass)
-            fuel_mass=3_400_000,  # kg (methane + LOX)
+            diameter=diameter,
+            dry_mass=dry_mass,  # kg (estimated dry mass)
+            fuel_mass=calculate_landing_fuel(dry_mass, thrust_kn, isp, diameter, safety_margin=1.10),  # 10% margin
             com_height=30.0,  # meters from bottom (estimated)
             fuel_com_height=34.5,  # meters (center)
+            thrust=thrust_kn * 1000,  # Convert kN to N
+            isp=isp,
         )
     
     @staticmethod
@@ -299,14 +394,21 @@ class RocketPresets:
         Chinese Long March 5 Core Stage (First Stage).
         
         Sources: CASC official data, Wikipedia
+        Fuel calculated for landing scenario from terminal velocity + 10% margin.
         """
+        dry_mass = 18_000
+        diameter = 5.0
+        thrust_kn = 700
+        isp = 310
         return RocketConfig(
             height=33.0,  # Core stage height
-            diameter=5.0,  # meters
-            dry_mass=18_000,  # kg (estimated dry mass)
-            fuel_mass=175_000,  # kg (kerosene + LOX)
+            diameter=diameter,
+            dry_mass=dry_mass,  # kg (estimated dry mass)
+            fuel_mass=calculate_landing_fuel(dry_mass, thrust_kn, isp, diameter),  # Landing fuel
             com_height=15.0,  # meters from bottom (estimated)
             fuel_com_height=16.5,  # meters (center)
+            thrust=thrust_kn * 1000,  # Convert kN to N
+            isp=isp,
         )
     
     @staticmethod
@@ -315,14 +417,21 @@ class RocketPresets:
         Chinese Long March 9 First Stage (in development).
         
         Sources: CASC official data, Wikipedia
+        Fuel calculated for landing scenario from terminal velocity + 10% margin.
         """
+        dry_mass = 150_000
+        diameter = 10.6
+        thrust_kn = 4800
+        isp = 335
         return RocketConfig(
             height=50.0,  # First stage height (estimated)
-            diameter=10.6,  # meters
-            dry_mass=150_000,  # kg (estimated)
-            fuel_mass=2_000_000,  # kg (kerosene + LOX, estimated)
+            diameter=diameter,
+            dry_mass=dry_mass,  # kg (estimated)
+            fuel_mass=calculate_landing_fuel(dry_mass, thrust_kn, isp, diameter),  # Landing fuel
             com_height=22.0,  # meters from bottom (estimated)
             fuel_com_height=25.0,  # meters (center)
+            thrust=thrust_kn * 1000,  # Convert kN to N
+            isp=isp,
         )
     
     @staticmethod
@@ -332,14 +441,21 @@ class RocketPresets:
         
         Sources: Roscosmos data, Wikipedia
         Note: Soyuz uses 4 strap-on boosters + core, modeled here as equivalent single stage
+        Fuel calculated for landing scenario from terminal velocity + 10% margin.
         """
+        dry_mass = 6_545
+        diameter = 2.95
+        thrust_kn = 838
+        isp = 263
         return RocketConfig(
             height=27.8,  # Core stage height
-            diameter=2.95,  # meters
-            dry_mass=6_545,  # kg (core dry mass)
-            fuel_mass=39_200,  # kg (RP-1 + LOX, core only)
+            diameter=diameter,
+            dry_mass=dry_mass,  # kg (core dry mass)
+            fuel_mass=calculate_landing_fuel(dry_mass, thrust_kn, isp, diameter),  # Landing fuel
             com_height=12.0,  # meters from bottom (estimated)
             fuel_com_height=13.9,  # meters (center)
+            thrust=thrust_kn * 1000,  # Convert kN to N
+            isp=isp,
         )
     
     @staticmethod
@@ -348,14 +464,21 @@ class RocketPresets:
         Russian Soyuz-2 Strap-on Booster (First Stage).
         
         Sources: Roscosmos data
+        Fuel calculated for landing scenario from terminal velocity + 10% margin.
         """
+        dry_mass = 3_784
+        diameter = 2.68
+        thrust_kn = 838
+        isp = 263
         return RocketConfig(
             height=19.6,  # Booster height
-            diameter=2.68,  # meters
-            dry_mass=3_784,  # kg (booster dry mass)
-            fuel_mass=39_200,  # kg (RP-1 + LOX)
+            diameter=diameter,
+            dry_mass=dry_mass,  # kg (booster dry mass)
+            fuel_mass=calculate_landing_fuel(dry_mass, thrust_kn, isp, diameter),  # Landing fuel
             com_height=8.0,  # meters from bottom (estimated)
             fuel_com_height=9.8,  # meters (center)
+            thrust=thrust_kn * 1000,  # Convert kN to N
+            isp=isp,
         )
     
     @staticmethod
@@ -364,14 +487,21 @@ class RocketPresets:
         Russian Proton-M First Stage.
         
         Sources: Roscosmos data, Wikipedia
+        Fuel calculated for landing scenario from terminal velocity + 10% margin.
         """
+        dry_mass = 31_000
+        diameter = 4.15
+        thrust_kn = 1014
+        isp = 285
         return RocketConfig(
             height=21.2,  # First stage height
-            diameter=4.15,  # meters
-            dry_mass=31_000,  # kg (dry mass)
-            fuel_mass=419_000,  # kg (UDMH + N2O4)
+            diameter=diameter,
+            dry_mass=dry_mass,  # kg (dry mass)
+            fuel_mass=calculate_landing_fuel(dry_mass, thrust_kn, isp, diameter),  # Landing fuel
             com_height=9.0,  # meters from bottom (estimated)
             fuel_com_height=10.6,  # meters (center)
+            thrust=thrust_kn * 1000,  # Convert kN to N
+            isp=isp,
         )
     
     @staticmethod
@@ -380,14 +510,21 @@ class RocketPresets:
         Russian Angara A5 First Stage (URM-1 Core).
         
         Sources: Roscosmos data
+        Fuel calculated for landing scenario from terminal velocity + 10% margin.
         """
+        dry_mass = 9_500
+        diameter = 3.6
+        thrust_kn = 2080
+        isp = 311
         return RocketConfig(
             height=25.0,  # URM-1 height
-            diameter=3.6,  # meters
-            dry_mass=9_500,  # kg (dry mass)
-            fuel_mass=132_000,  # kg (kerosene + LOX)
+            diameter=diameter,
+            dry_mass=dry_mass,  # kg (dry mass)
+            fuel_mass=calculate_landing_fuel(dry_mass, thrust_kn, isp, diameter),  # Landing fuel
             com_height=11.0,  # meters from bottom (estimated)
             fuel_com_height=12.5,  # meters (center)
+            thrust=thrust_kn * 1000,  # Convert kN to N
+            isp=isp,
         )
     
     @staticmethod
@@ -396,14 +533,20 @@ class RocketPresets:
         Chinese Zhuque-2 First Stage (LandSpace).
         
         Sources: LandSpace official data
+        Fuel calculated for landing scenario.
         """
+        dry_mass = 8_000
+        thrust_kn = 670
+        isp = 290
         return RocketConfig(
             height=30.0,  # First stage height (estimated)
             diameter=3.35,  # meters
-            dry_mass=8_000,  # kg (estimated dry mass)
-            fuel_mass=75_000,  # kg (methane + LOX)
+            dry_mass=dry_mass,  # kg (estimated dry mass)
+            fuel_mass=calculate_landing_fuel(dry_mass, thrust_kn, isp),  # Landing fuel
             com_height=13.0,  # meters from bottom (estimated)
             fuel_com_height=15.0,  # meters (center)
+            thrust=thrust_kn * 1000,  # Convert kN to N
+            isp=isp,
         )
     
     @staticmethod
@@ -412,14 +555,20 @@ class RocketPresets:
         Chinese Zhuque-3 First Stage (LandSpace, reusable).
         
         Sources: LandSpace official data
+        Fuel calculated for landing scenario.
         """
+        dry_mass = 25_000
+        thrust_kn = 670
+        isp = 290
         return RocketConfig(
             height=40.0,  # First stage height (estimated)
             diameter=4.5,  # meters
-            dry_mass=25_000,  # kg (estimated dry mass)
-            fuel_mass=250_000,  # kg (methane + LOX)
+            dry_mass=dry_mass,  # kg (estimated dry mass)
+            fuel_mass=calculate_landing_fuel(dry_mass, thrust_kn, isp),  # Landing fuel
             com_height=18.0,  # meters from bottom (estimated)
             fuel_com_height=20.0,  # meters (center)
+            thrust=thrust_kn * 1000,  # Convert kN to N
+            isp=isp,
         )
     
     @staticmethod
@@ -437,7 +586,6 @@ class RocketPresets:
             ValueError: If preset name is not found
         """
         presets = {
-            "falcon9_block5": RocketPresets.falcon9_block5,
             "falcon9_block5_landing": RocketPresets.falcon9_block5_landing,
             "starship_super_heavy": RocketPresets.starship_super_heavy,
             "long_march5_core": RocketPresets.long_march5_core,
@@ -468,7 +616,6 @@ class RocketPresets:
             List of preset names
         """
         return [
-            "falcon9_block5",
             "falcon9_block5_landing",
             "starship_super_heavy",
             "long_march5_core",

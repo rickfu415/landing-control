@@ -1,6 +1,7 @@
 """Core physics engine for rocket simulation."""
 
 import numpy as np
+import math
 from dataclasses import dataclass, field
 from typing import Tuple
 from .constants import (
@@ -15,6 +16,7 @@ from .constants import (
     ENGINE_MASS_FLOW_MAX,
     PHYSICS_TICK_RATE,
     MAX_LANDING_VELOCITY_VERTICAL,
+    MAX_LANDING_VELOCITY_HORIZONTAL,
     MAX_LANDING_ANGLE,
     LANDING_PAD_RADIUS,
     INITIAL_ALTITUDE,
@@ -39,6 +41,9 @@ class RocketState:
     
     # Velocity (m/s)
     velocity: np.ndarray = field(default_factory=lambda: np.array([0.0, INITIAL_VELOCITY_VERTICAL, 0.0]))
+    
+    # Acceleration (m/s²) - for recording/debugging
+    acceleration: np.ndarray = field(default_factory=lambda: np.array([0.0, 0.0, 0.0]))
     
     # Orientation quaternion (w, x, y, z) - starts upright
     orientation: np.ndarray = field(default_factory=lambda: np.array([1.0, 0.0, 0.0, 0.0]))
@@ -68,6 +73,9 @@ class RocketState:
     landed: bool = False
     crashed: bool = False
     
+    # Touchdown velocity (saved at moment of landing/crash)
+    touchdown_velocity: float = 0.0  # m/s (total speed at touchdown)
+    
     def to_dict(self, geometry: RocketGeometry = None, aerodynamics_model = None) -> dict:
         """Convert state to dictionary for JSON serialization."""
         result = {
@@ -83,6 +91,7 @@ class RocketState:
             "phase": self.phase,
             "landed": self.landed,
             "crashed": self.crashed,
+            "touchdown_velocity": self.touchdown_velocity,
             "altitude": self.position[1],
             "speed": float(np.linalg.norm(self.velocity)),
             "vertical_speed": self.velocity[1],
@@ -97,6 +106,10 @@ class RocketState:
                 "diameter": geometry.config.diameter,
                 "radius": geometry.radius,
                 "cross_sectional_area": geometry.cross_sectional_area,
+                "initial_fuel_mass": geometry.config.fuel_mass,  # For fuel gauge max value
+                "thrust": geometry.config.thrust,  # N
+                "isp": geometry.config.isp,  # seconds
+                "dry_mass": geometry.config.dry_mass,  # kg
             }
         
         # Add terminal velocity information
@@ -122,7 +135,7 @@ class RocketState:
 class PhysicsEngine:
     """Main physics simulation engine."""
     
-    def __init__(self, rocket_config: RocketConfig = None, wind_config: WindConfig = None, use_6dof: bool = True):
+    def __init__(self, rocket_config: RocketConfig = None, wind_config: WindConfig = None, use_6dof: bool = True, flight_recorder=None):
         self.dt = 1.0 / PHYSICS_TICK_RATE
         self.atmosphere = Atmosphere()
         self.geometry = RocketGeometry(config=rocket_config)
@@ -130,9 +143,23 @@ class PhysicsEngine:
         self.aerodynamics = AerodynamicsModel()
         self.dynamics = RigidBodyDynamics(geometry=self.geometry)
         self.torque_calculator = TorqueCalculator(geometry=self.geometry)
-        self.state = RocketState()
+        
+        # Calculate initial velocity based on terminal velocity at STARTING altitude
+        # At terminal velocity, drag = weight, so rocket maintains constant speed
+        # As rocket descends into denser air, it will naturally decelerate
+        # (because terminal velocity decreases with altitude)
+        initial_mass = self.geometry.config.dry_mass + self.geometry.config.fuel_mass
+        initial_velocity = self._calculate_terminal_velocity(initial_mass, INITIAL_ALTITUDE)
+        
+        # Initialize state with fuel from rocket config and terminal velocity
+        self.state = RocketState(
+            position=np.array([0.0, INITIAL_ALTITUDE, 0.0]),
+            velocity=np.array([0.0, -initial_velocity, 0.0]),  # Negative for downward
+            fuel=self.geometry.config.fuel_mass
+        )
         self.time = 0.0
         self.use_6dof = use_6dof  # Flag to enable/disable 6-DOF solver
+        self.flight_recorder = flight_recorder  # Optional flight data recorder
     
     def get_terminal_velocity(self, orientation: str = "axial") -> float:
         """
@@ -151,11 +178,54 @@ class PhysicsEngine:
             mass, area, altitude, orientation=orientation
         )
     
-    def reset(self, altitude: float = INITIAL_ALTITUDE, velocity: float = INITIAL_VELOCITY_VERTICAL):
-        """Reset simulation to initial conditions."""
+    def _calculate_terminal_velocity(self, mass: float, altitude: float) -> float:
+        """
+        Calculate terminal velocity for given mass and altitude.
+        
+        Formula: v_term = sqrt(2 * m * g / (ρ * A * Cd))
+        
+        Args:
+            mass: Total rocket mass in kg
+            altitude: Altitude in meters
+            
+        Returns:
+            Terminal velocity in m/s (positive value)
+        """
+        from .constants import SEA_LEVEL_DENSITY, SEA_LEVEL_TEMPERATURE, TEMPERATURE_LAPSE_RATE
+        
+        # Atmospheric density at altitude (ISA model)
+        temp_at_alt = SEA_LEVEL_TEMPERATURE - TEMPERATURE_LAPSE_RATE * altitude
+        density = SEA_LEVEL_DENSITY * (temp_at_alt / SEA_LEVEL_TEMPERATURE) ** 4.256
+        
+        # Cross-sectional area
+        area = self.geometry.cross_sectional_area
+        
+        # Drag coefficient (axial, subsonic)
+        Cd = 0.6
+        
+        # Terminal velocity
+        v_term = math.sqrt(2 * mass * GRAVITY / (density * area * Cd))
+        
+        return v_term
+    
+    def reset(self, altitude: float = INITIAL_ALTITUDE, velocity: float = None):
+        """
+        Reset simulation to initial conditions.
+        
+        Args:
+            altitude: Initial altitude in meters
+            velocity: Initial velocity in m/s (if None, uses terminal velocity at that altitude)
+        """
+        # Calculate terminal velocity at starting altitude if not provided
+        if velocity is None:
+            initial_mass = self.geometry.config.dry_mass + self.geometry.config.fuel_mass
+            terminal_velocity = self._calculate_terminal_velocity(initial_mass, altitude)
+            velocity = -terminal_velocity  # Negative for downward
+        
         self.state = RocketState(
             position=np.array([0.0, altitude, 0.0]),
             velocity=np.array([0.0, velocity, 0.0]),
+            fuel=self.geometry.config.fuel_mass,  # Use fuel from rocket config
         )
         self.time = 0.0
         self.wind.reset()
@@ -169,9 +239,8 @@ class PhysicsEngine:
         if self.state.throttle <= 0 or self.state.fuel <= 0:
             return np.array([0.0, 0.0, 0.0])
         
-        # Effective throttle (minimum 40% when engine is on)
-        effective_throttle = max(self.state.throttle, ENGINE_THROTTLE_MIN)
-        thrust_magnitude = ENGINE_THRUST_MAX * effective_throttle
+        # Use thrust from rocket config (throttle already has minimum enforced)
+        thrust_magnitude = self.geometry.config.thrust * self.state.throttle
         
         # Apply gimbal angles (convert to radians)
         gimbal_pitch = np.radians(np.clip(self.state.gimbal[0], -ENGINE_GIMBAL_RANGE, ENGINE_GIMBAL_RANGE))
@@ -232,9 +301,11 @@ class PhysicsEngine:
     def consume_fuel(self):
         """Consume fuel based on current throttle."""
         if self.state.throttle > 0 and self.state.fuel > 0:
-            effective_throttle = max(self.state.throttle, ENGINE_THROTTLE_MIN)
-            # Mass flow rate proportional to throttle
-            fuel_consumption = ENGINE_MASS_FLOW_MAX * effective_throttle * self.dt
+            # Calculate mass flow rate from rocket's thrust and ISP
+            # Formula: mdot = Thrust / (ISP × g₀)
+            mass_flow_rate = self.geometry.config.thrust / (self.geometry.config.isp * GRAVITY)
+            # Fuel consumption proportional to throttle (already has minimum enforced)
+            fuel_consumption = mass_flow_rate * self.state.throttle * self.dt
             self.state.fuel = max(0, self.state.fuel - fuel_consumption)
     
     def rotate_vector_by_quaternion(self, v: np.ndarray, q: np.ndarray) -> np.ndarray:
@@ -288,8 +359,8 @@ class PhysicsEngine:
         """Apply torques from gimbal and grid fins for attitude control."""
         # Gimbal creates torque proportional to thrust and gimbal angle
         if self.state.throttle > 0 and self.state.fuel > 0:
-            effective_throttle = max(self.state.throttle, ENGINE_THROTTLE_MIN)
-            thrust = ENGINE_THRUST_MAX * effective_throttle
+            # Use thrust from rocket config (throttle already has minimum enforced)
+            thrust = self.geometry.config.thrust * self.state.throttle
             
             # Moment arm (distance from engine to center of mass)
             moment_arm = ROCKET_COM_HEIGHT
@@ -312,10 +383,29 @@ class PhysicsEngine:
     
     def check_landing(self):
         """Check if rocket has landed or crashed."""
-        if self.state.position[1] <= 0:
+        # Calculate the position of the rocket's bottom (engine end)
+        # The rocket's center is at position[1], we need to find the bottom
+        # Down vector in body frame is [0, -1, 0] (opposite of up)
+        # Distance from center to bottom depends on COM location
+        down_body = np.array([0.0, -1.0, 0.0])
+        down_world = self.rotate_vector_by_quaternion(down_body, self.state.orientation)
+        
+        # Distance from COM to bottom of rocket
+        com_to_bottom = self.geometry.config.com_height
+        
+        # Position of the bottom of the rocket
+        bottom_position = self.state.position + down_world * com_to_bottom
+        bottom_altitude = bottom_position[1]
+        
+        if bottom_altitude <= 0:
+            # Calculate touchdown velocity BEFORE zeroing it
             vertical_speed = abs(self.state.velocity[1])
             horizontal_speed = np.sqrt(self.state.velocity[0]**2 + self.state.velocity[2]**2)
+            total_speed = np.linalg.norm(self.state.velocity)  # Total velocity magnitude
             horizontal_distance = np.sqrt(self.state.position[0]**2 + self.state.position[2]**2)
+            
+            # Save touchdown velocity for stats
+            self.state.touchdown_velocity = total_speed
             
             # Calculate tilt angle from vertical
             # Up vector in body frame is [0, 1, 0]
@@ -324,6 +414,7 @@ class PhysicsEngine:
             
             # Check landing conditions
             if (vertical_speed <= MAX_LANDING_VELOCITY_VERTICAL and 
+                horizontal_speed <= MAX_LANDING_VELOCITY_HORIZONTAL and
                 tilt_angle <= MAX_LANDING_ANGLE and
                 horizontal_distance <= LANDING_PAD_RADIUS):
                 self.state.landed = True
@@ -332,8 +423,13 @@ class PhysicsEngine:
                 self.state.crashed = True
                 self.state.phase = "crashed"
             
-            # Stop the rocket
-            self.state.position[1] = 0
+            # IMPORTANT: Record final frame WITH velocity before zeroing it
+            if self.flight_recorder:
+                self.flight_recorder.record_frame(self.state, self.time, self.geometry)
+                self.flight_recorder.add_touchdown_event(self.state, self.time)
+            
+            # Stop the rocket at ground level (adjust COM position so bottom is at y=0)
+            self.state.position[1] = com_to_bottom  # COM is at height = com_to_bottom when bottom touches ground
             self.state.velocity = np.array([0.0, 0.0, 0.0])
             self.state.angular_velocity = np.array([0.0, 0.0, 0.0])
     
@@ -377,6 +473,9 @@ class PhysicsEngine:
         total_force = gravity + thrust + drag
         acceleration = total_force / mass
         
+        # Store acceleration in state for recording
+        self.state.acceleration = acceleration
+        
         # Update velocity and position (semi-implicit Euler)
         self.state.velocity += acceleration * self.dt
         self.state.position += self.state.velocity * self.dt
@@ -391,10 +490,14 @@ class PhysicsEngine:
         # Update phase
         self.update_phase()
         
-        # Check for landing/crash
+        # Check for landing/crash (this will record final frame with velocity before zeroing)
         self.check_landing()
         
         self.time += self.dt
+        
+        # Record flight data (skip if just landed/crashed - already recorded in check_landing)
+        if self.flight_recorder and not self.state.landed and not self.state.crashed:
+            self.flight_recorder.record_frame(self.state, self.time, self.geometry)
         
         return self.state
     
@@ -448,11 +551,15 @@ class PhysicsEngine:
         # Total forces in world frame
         total_force_world = gravity + thrust_world + aero_force_world
         
+        # Calculate and store acceleration for recording
+        mass = self.get_mass()
+        self.state.acceleration = total_force_world / mass
+        
         # Calculate torques in body frame
         # Thrust vector in body frame (for torque calculation)
         if self.state.throttle > 0 and self.state.fuel > 0:
-            effective_throttle = max(self.state.throttle, ENGINE_THROTTLE_MIN)
-            thrust_magnitude = ENGINE_THRUST_MAX * effective_throttle
+            # Use thrust from rocket config (throttle already has minimum enforced)
+            thrust_magnitude = self.geometry.config.thrust * self.state.throttle
             gimbal_pitch = np.radians(np.clip(self.state.gimbal[0], -ENGINE_GIMBAL_RANGE, ENGINE_GIMBAL_RANGE))
             gimbal_yaw = np.radians(np.clip(self.state.gimbal[1], -ENGINE_GIMBAL_RANGE, ENGINE_GIMBAL_RANGE))
             # Thrust vector in body frame (same as in get_thrust_vector)
@@ -495,10 +602,14 @@ class PhysicsEngine:
         # Update phase
         self.update_phase()
         
-        # Check for landing/crash
+        # Check for landing/crash (this will record final frame with velocity before zeroing)
         self.check_landing()
         
         self.time += self.dt
+        
+        # Record flight data (skip if just landed/crashed - already recorded in check_landing)
+        if self.flight_recorder and not self.state.landed and not self.state.crashed:
+            self.flight_recorder.record_frame(self.state, self.time, self.geometry)
         
         return self.state
     
@@ -506,7 +617,11 @@ class PhysicsEngine:
                   grid_fins: Tuple[float, float, float, float] = None):
         """Set control inputs."""
         if throttle is not None:
-            self.state.throttle = np.clip(throttle, 0.0, 1.0)
+            # Enforce minimum throttle: either 0 (off) or >= 40% (on)
+            if throttle > 0:
+                self.state.throttle = np.clip(max(throttle, ENGINE_THROTTLE_MIN), 0.0, 1.0)
+            else:
+                self.state.throttle = 0.0
         
         if gimbal is not None:
             self.state.gimbal = np.array([

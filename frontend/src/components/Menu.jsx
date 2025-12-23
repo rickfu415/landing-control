@@ -1,121 +1,239 @@
 import useGameStore from '../stores/gameStore'
+import useLanguageStore from '../stores/languageStore'
+import { useTranslation } from '../i18n/translations'
+import { getRocketSpecs, formatMass } from '../data/rocketSpecs'
 
 function Menu() {
-  const { connected, gameMode, setGameMode, startGame } = useGameStore()
+  const { connected, rocketPreset, setRocketPreset, startGame } = useGameStore()
+  const { language } = useLanguageStore()
+  const t = useTranslation(language)
+  
+  // Get specs for selected rocket
+  const specs = getRocketSpecs(rocketPreset)
+  
+  // Available rockets grouped by origin
+  const rocketGroups = [
+    {
+      name: language === 'zh' ? '美国 SpaceX' : 'SpaceX (USA)',
+      rockets: [
+        { id: 'falcon9_block5_landing', flag: '🇺🇸' },
+        { id: 'starship_super_heavy', flag: '🇺🇸' }
+      ]
+    },
+    {
+      name: language === 'zh' ? '中国' : 'China',
+      rockets: [
+        { id: 'long_march5_core', flag: '🇨🇳' },
+        { id: 'long_march9_first_stage', flag: '🇨🇳' },
+        { id: 'zhuque2_first_stage', flag: '🇨🇳' },
+        { id: 'zhuque3_first_stage', flag: '🇨🇳' }
+      ]
+    },
+    {
+      name: language === 'zh' ? '俄罗斯' : 'Russia',
+      rockets: [
+        { id: 'soyuz_first_stage', flag: '🇷🇺' },
+        { id: 'soyuz_booster', flag: '🇷🇺' },
+        { id: 'proton_m_first_stage', flag: '🇷🇺' },
+        { id: 'angara_a5_first_stage', flag: '🇷🇺' }
+      ]
+    }
+  ]
   
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="hud-panel p-8 rounded-2xl max-w-md w-full mx-4">
+    <div className="absolute inset-0 flex items-start justify-center bg-black/70 backdrop-blur-sm overflow-y-auto py-8">
+      <div className="hud-panel p-8 rounded-2xl w-full max-w-7xl mx-8">
         {/* Title */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-display font-black text-white mb-2">
-            FALCON<span className="text-rocket-orange">LANDER</span>
+          <h1 className="text-5xl md:text-6xl font-display font-black text-white mb-3">
+            {t.menu.title}<span className="text-rocket-orange">{t.menu.titleHighlight}</span>
           </h1>
-          <p className="text-gray-400 text-sm">
-            Falcon 9 First Stage Landing Simulator
+          <p className="text-gray-400 text-lg">
+            {t.menu.subtitle}
           </p>
         </div>
         
-        {/* Game mode selection */}
-        <div className="mb-6">
-          <label className="text-xs uppercase tracking-wider text-gray-400 mb-3 block">
-            Game Mode
-          </label>
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { id: 'manual', label: 'Manual', desc: 'Full control' },
-              { id: 'assisted', label: 'Assisted', desc: 'Auto attitude' },
-              { id: 'autonomous', label: 'Auto', desc: 'Watch AI' },
-            ].map((mode) => (
-              <button
-                key={mode.id}
-                onClick={() => setGameMode(mode.id)}
-                className={`p-3 rounded-lg border transition-all ${
-                  gameMode === mode.id
-                    ? 'border-rocket-orange bg-rocket-orange/20 text-white'
-                    : 'border-gray-700 bg-space-800 text-gray-400 hover:border-gray-500'
-                }`}
-              >
-                <div className="font-bold text-sm">{mode.label}</div>
-                <div className="text-[10px] opacity-70">{mode.desc}</div>
-              </button>
-            ))}
+        {/* Two Column Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          
+          {/* LEFT COLUMN - Configuration */}
+          <div className="space-y-6">
+            
+            {/* Rocket selection */}
+            <div>
+              <label className="text-sm uppercase tracking-wider text-gray-400 mb-3 block font-bold">
+                {t.menu.rocketSelection}
+              </label>
+              <div className="space-y-4 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
+                {rocketGroups.map((group) => (
+                  <div key={group.name}>
+                    <div className="text-xs text-gray-500 uppercase tracking-wider mb-2 px-1 font-bold">
+                      {group.name}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {group.rockets.map((rocket) => (
+                        <button
+                          key={rocket.id}
+                          onClick={() => setRocketPreset(rocket.id)}
+                          className={`p-3 rounded-lg border transition-all text-left ${
+                            rocketPreset === rocket.id
+                              ? 'border-rocket-orange bg-rocket-orange/20 text-white shadow-lg shadow-rocket-orange/20'
+                              : 'border-gray-700 bg-space-800 text-gray-400 hover:border-gray-500 hover:bg-space-700'
+                          }`}
+                        >
+                          <div className="text-sm font-bold flex items-center gap-2">
+                            <span className="text-lg">{rocket.flag}</span>
+                            <span className="truncate">{t.menu.rockets[rocket.id]}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            {/* Start button */}
+            <button
+              onClick={startGame}
+              disabled={!connected}
+              className={`w-full py-5 rounded-lg font-display font-bold text-xl uppercase tracking-wider transition-all ${
+                connected
+                  ? 'btn-primary cursor-pointer'
+                  : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              {connected ? t.menu.launchMission : t.menu.connecting}
+            </button>
+            
+            {/* Controls hint */}
+            <div className="pt-4 border-t border-gray-700">
+              <h3 className="text-sm uppercase tracking-wider text-gray-400 mb-3 font-bold">
+                {t.menu.controls}
+              </h3>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs text-gray-500">
+                <div className="flex items-center gap-2">
+                  <span className="text-rocket-orange">▸</span>
+                  {t.menu.controlsHints.throttle}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-rocket-orange">▸</span>
+                  {t.menu.controlsHints.camera}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-rocket-orange">▸</span>
+                  {t.menu.controlsHints.gimbal}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-rocket-orange">▸</span>
+                  {t.menu.controlsHints.zoom}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-rocket-orange">▸</span>
+                  {t.menu.controlsHints.fullThrottle}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-rocket-orange">▸</span>
+                  {t.menu.controlsHints.pause}
+                </div>
+              </div>
+            </div>
+            
           </div>
-        </div>
-        
-        {/* Start button */}
-        <button
-          onClick={startGame}
-          disabled={!connected}
-          className={`w-full py-4 rounded-lg font-display font-bold text-lg uppercase tracking-wider transition-all ${
-            connected
-              ? 'btn-primary cursor-pointer'
-              : 'bg-gray-700 text-gray-500 cursor-not-allowed'
-          }`}
-        >
-          {connected ? 'Launch Mission' : 'Connecting...'}
-        </button>
-        
-        {/* Realistic parameters info */}
-        <div className="mt-6 pt-6 border-t border-gray-700">
-          <h3 className="text-xs uppercase tracking-wider text-gray-400 mb-3">
-            Vehicle Specifications (Falcon 9 Block 5)
-          </h3>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] text-gray-500">
-            <div>Dry Mass: 22,200 kg</div>
-            <div className="text-yellow-500">Landing Fuel: 3,000 kg ⚠️</div>
-            <div>Engine: Merlin 1D</div>
-            <div>Thrust: 845 kN</div>
-            <div>ISP: 282s (sea level)</div>
-            <div>Throttle: 40-100%</div>
-            <div>Gimbal: ±5°</div>
-            <div>Gravity: 9.80665 m/s²</div>
+          
+          {/* RIGHT COLUMN - Information */}
+          <div className="space-y-6">
+
+            
+            {/* Vehicle Specifications */}
+            <div className="bg-space-900/50 p-6 rounded-lg border border-gray-700">
+              <h3 className="text-sm uppercase tracking-wider text-gray-400 mb-4 font-bold flex items-center gap-2">
+                <span className="text-rocket-orange">🚀</span>
+                {t.menu.vehicleSpecs}
+              </h3>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm text-gray-400">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">{language === 'zh' ? '高度' : 'Height'}:</span>
+                  <span className="font-mono text-white">{specs.height} m</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">{language === 'zh' ? '直径' : 'Diameter'}:</span>
+                  <span className="font-mono text-white">{specs.diameter} m</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">{language === 'zh' ? '干质量' : 'Dry Mass'}:</span>
+                  <span className="font-mono text-white">{formatMass(specs.dryMass)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">{language === 'zh' ? '燃料' : 'Fuel'}:</span>
+                  <span className={`font-mono ${specs.fuelMass < 10000 ? 'text-yellow-400' : 'text-white'}`}>
+                    {formatMass(specs.fuelMass)} {specs.fuelMass < 10000 ? '⚠️' : ''}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">{language === 'zh' ? '发动机' : 'Engine'}:</span>
+                  <span className="font-mono text-white">{specs.engine}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">{language === 'zh' ? '推力' : 'Thrust'}:</span>
+                  <span className="font-mono text-white">{specs.thrust} kN</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">{language === 'zh' ? '比冲' : 'ISP'}:</span>
+                  <span className="font-mono text-white">{specs.isp}s</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">{language === 'zh' ? '节流阀' : 'Throttle'}:</span>
+                  <span className="font-mono text-white">{specs.throttle}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">{language === 'zh' ? '万向节' : 'Gimbal'}:</span>
+                  <span className="font-mono text-white">{specs.gimbal}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">{language === 'zh' ? '重力' : 'Gravity'}:</span>
+                  <span className="font-mono text-white">9.81 m/s²</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Mission Briefing */}
+            <div className="bg-space-900/50 p-6 rounded-lg border border-gray-700">
+              <h3 className="text-sm uppercase tracking-wider text-gray-400 mb-4 font-bold flex items-center gap-2">
+                <span className="text-rocket-orange">📋</span>
+                {t.menu.missionBriefing}
+              </h3>
+              <ul className="text-sm text-gray-400 space-y-3">
+                <li className="flex items-start gap-3">
+                  <span className="text-rocket-orange text-lg">▸</span>
+                  <span>{t.menu.briefing.initial}</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-yellow-500 text-lg">▸</span>
+                  <span className="text-yellow-400 font-semibold">
+                    {language === 'zh' 
+                      ? `初始燃料：${formatMass(specs.fuelMass)} - 请高效使用！` 
+                      : `Initial fuel: ${formatMass(specs.fuelMass)} - be efficient!`}
+                  </span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-rocket-orange text-lg">▸</span>
+                  <span>{t.menu.briefing.landingVelocity}</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-rocket-orange text-lg">▸</span>
+                  <span>{t.menu.briefing.padDistance}</span>
+                </li>
+              </ul>
+            </div>
+            
+            {/* Footer */}
+            <div className="text-center text-sm text-gray-500 italic">
+              {t.menu.footer}
+            </div>
+            
           </div>
-        </div>
-        
-        {/* Mission briefing */}
-        <div className="mt-4 pt-4 border-t border-gray-700">
-          <h3 className="text-xs uppercase tracking-wider text-gray-400 mb-3">
-            Mission Briefing
-          </h3>
-          <ul className="text-xs text-gray-500 space-y-1">
-            <li className="flex items-start gap-2">
-              <span className="text-rocket-orange">▸</span>
-              <span>Initial: 5,000m altitude, -180 m/s descent</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-yellow-500">▸</span>
-              <span className="text-yellow-500">Only 3,000 kg fuel - be efficient!</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-rocket-orange">▸</span>
-              <span>Land with velocity &lt; 2 m/s vertical</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-rocket-orange">▸</span>
-              <span>Stay within 25m of pad center</span>
-            </li>
-          </ul>
-        </div>
-        
-        {/* Controls hint */}
-        <div className="mt-4 pt-4 border-t border-gray-700">
-          <h3 className="text-xs uppercase tracking-wider text-gray-400 mb-2">
-            Controls
-          </h3>
-          <div className="grid grid-cols-2 gap-x-4 text-[10px] text-gray-500">
-            <div>W/S - Throttle up/down</div>
-            <div>🖱️ Drag - Orbit camera</div>
-            <div>A/D/Q/E - Gimbal control</div>
-            <div>Scroll - Zoom in/out</div>
-            <div>SPACE - Full throttle</div>
-            <div>P - Pause game</div>
-          </div>
-        </div>
-        
-        {/* Footer */}
-        <div className="mt-6 text-center text-[10px] text-gray-600">
-          Good luck, astronaut! 🚀
+          
         </div>
       </div>
     </div>

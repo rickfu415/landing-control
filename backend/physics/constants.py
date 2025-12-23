@@ -125,8 +125,8 @@ LANDING_PAD_WIDTH = 52.0  # meters (170 ft)
 LANDING_PAD_RADIUS = 25.0  # meters (effective target radius)
 
 # Landing success criteria
-MAX_LANDING_VELOCITY_VERTICAL = 2.0  # m/s (must be slower for safe landing)
-MAX_LANDING_VELOCITY_HORIZONTAL = 1.0  # m/s
+MAX_LANDING_VELOCITY_VERTICAL = 3.5  # m/s (vertical touchdown speed limit)
+MAX_LANDING_VELOCITY_HORIZONTAL = 2.0  # m/s (horizontal touchdown speed limit)
 MAX_LANDING_ANGLE = 5.0  # degrees from vertical (tilt limit)
 
 # Landing abort thresholds

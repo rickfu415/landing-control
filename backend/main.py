@@ -26,8 +26,9 @@ game_loop_task = None
 class CreateGameRequest(BaseModel):
     mode: str = "manual"
     initial_altitude: float = 5000.0
-    initial_velocity: float = -200.0
+    # initial_velocity is now calculated from terminal velocity (not a user input)
     wind_level: int = 0  # Beaufort scale level (1-9), 0 = no wind (default)
+    rocket_preset: str = "falcon9_block5_landing"  # Rocket configuration preset
 
 
 class GameInputRequest(BaseModel):
@@ -111,8 +112,9 @@ async def create_game(request: CreateGameRequest):
     config = GameConfig(
         mode=mode_map.get(request.mode, GameMode.MANUAL),
         initial_altitude=request.initial_altitude,
-        initial_velocity=request.initial_velocity,
+        # initial_velocity removed - calculated from terminal velocity
         wind_level=wind_level,
+        rocket_preset=request.rocket_preset,
     )
     
     session = GameSession(session_id, config)
@@ -123,8 +125,9 @@ async def create_game(request: CreateGameRequest):
         "config": {
             "mode": request.mode,
             "initial_altitude": request.initial_altitude,
-            "initial_velocity": request.initial_velocity,
+            # initial_velocity is now calculated per rocket
             "wind_level": wind_level,
+            "rocket_preset": request.rocket_preset,
         }
     }
 
@@ -250,6 +253,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 # Update game configuration
                 mode = data.get("mode", "manual")
                 wind_level = data.get("wind_level")
+                rocket_preset = data.get("rocket_preset")
                 
                 mode_map = {
                     "manual": GameMode.MANUAL,
@@ -263,7 +267,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     wind_level = max(0, min(9, int(wind_level)))
                     sessions[session_id].config.wind_level = wind_level
                     # Reinitialize wind model with new config
-                    from physics.wind import WindConfig
+                    from physics.wind import WindConfig, WindModel
                     wind_config = WindConfig(
                         enabled=(wind_level > 0),
                         wind_level=wind_level if wind_level > 0 else 1,  # Use 1 as placeholder if disabled
@@ -272,10 +276,39 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     )
                     sessions[session_id].physics.wind = WindModel(config=wind_config)
                 
+                if rocket_preset is not None:
+                    # Update rocket configuration
+                    from physics.geometry import RocketPresets
+                    try:
+                        rocket_config = RocketPresets.get_preset(rocket_preset)
+                        sessions[session_id].config.rocket_preset = rocket_preset
+                        # Reinitialize physics engine with new rocket
+                        from physics.wind import WindConfig, WindModel
+                        from physics.engine import PhysicsEngine
+                        wind_config = WindConfig(
+                            enabled=(sessions[session_id].config.wind_level > 0),
+                            wind_level=sessions[session_id].config.wind_level if sessions[session_id].config.wind_level > 0 else 1,
+                            turbulence_strength=0.3,
+                            seed=None
+                        )
+                        # IMPORTANT: Pass flight_recorder to new physics engine!
+                        sessions[session_id].physics = PhysicsEngine(
+                            rocket_config=rocket_config, 
+                            wind_config=wind_config,
+                            flight_recorder=sessions[session_id].flight_recorder
+                        )
+                        # Reset physics to apply new rocket (velocity will be calculated from terminal velocity)
+                        sessions[session_id].physics.reset(
+                            altitude=sessions[session_id].config.initial_altitude
+                        )
+                    except ValueError:
+                        pass  # Invalid preset, ignore
+                
                 await websocket.send_json({
                     "type": "config_updated",
                     "mode": mode,
-                    "wind_level": sessions[session_id].config.wind_level
+                    "wind_level": sessions[session_id].config.wind_level,
+                    "rocket_preset": sessions[session_id].config.rocket_preset
                 })
     
     except WebSocketDisconnect:

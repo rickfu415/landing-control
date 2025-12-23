@@ -22,6 +22,7 @@ const useGameStore = create((set, get) => ({
     time: 0,
     score: 0,
     mode: 'manual',
+    flight_review: null,  // Flight review data (populated on game over)
     rocket: {
       position: [0, INITIAL_ALTITUDE, 0],
       velocity: [0, INITIAL_VELOCITY, 0],
@@ -38,6 +39,7 @@ const useGameStore = create((set, get) => ({
       landed: false,
       crashed: false,
       legs_deployed: false,
+      touchdown_velocity: 0,
       geometry: {
         height: 47.7,
         diameter: 3.66,
@@ -54,6 +56,7 @@ const useGameStore = create((set, get) => ({
   // UI state
   showMenu: true,
   gameMode: 'manual',
+  rocketPreset: 'falcon9_block5_landing',
   
   // Actions
   setConnected: (connected) => set({ connected }),
@@ -94,12 +97,13 @@ const useGameStore = create((set, get) => ({
   
   setShowMenu: (showMenu) => set({ showMenu }),
   setGameMode: (gameMode) => set({ gameMode }),
+  setRocketPreset: (rocketPreset) => set({ rocketPreset }),
   
   // Game control actions
   startGame: () => {
-    const { ws, connected, gameMode } = get()
+    const { ws, connected, gameMode, rocketPreset } = get()
     if (ws && connected) {
-      ws.send(JSON.stringify({ type: 'config', mode: gameMode }))
+      ws.send(JSON.stringify({ type: 'config', mode: gameMode, rocket_preset: rocketPreset }))
       ws.send(JSON.stringify({ type: 'start' }))
       set({ showMenu: false })
     }

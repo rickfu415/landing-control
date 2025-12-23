@@ -8,6 +8,7 @@ from enum import Enum
 
 from physics.engine import PhysicsEngine, RocketState
 from game.scoring import calculate_score
+from game.flight_recorder import FlightRecorder
 
 
 class GameMode(str, Enum):
@@ -21,8 +22,9 @@ class GameConfig:
     """Configuration for a game session."""
     mode: GameMode = GameMode.MANUAL
     initial_altitude: float = 5000.0
-    initial_velocity: float = -200.0
+    # initial_velocity is now calculated from terminal velocity (not fixed)
     wind_level: int = 0  # Beaufort scale level (1-9), 0 = no wind (default)
+    rocket_preset: str = "falcon9_block5_landing"  # Rocket configuration preset
 
 
 class GameSession:
@@ -46,8 +48,19 @@ class GameSession:
             seed=None  # Random seed for each run (different each time)
         )
         
+        # Initialize rocket configuration
+        from physics.geometry import RocketPresets, RocketConfig
+        try:
+            rocket_config = RocketPresets.get_preset(self.config.rocket_preset)
+        except ValueError:
+            # Fall back to default if invalid preset
+            rocket_config = RocketPresets.get_preset("falcon9_block5_landing")
+        
+        # Initialize flight recorder
+        self.flight_recorder = FlightRecorder(sample_interval=0.05)  # Record every 0.05 seconds (20 Hz)
+        
         # Initialize subsystems
-        self.physics = PhysicsEngine(wind_config=wind_config)
+        self.physics = PhysicsEngine(rocket_config=rocket_config, wind_config=wind_config, flight_recorder=self.flight_recorder)
         self.guidance = None  # Lazy load to avoid circular import
         
         # Game state
@@ -76,9 +89,9 @@ class GameSession:
     
     def reset(self):
         """Reset game to initial state."""
+        # Reset physics (velocity will be calculated from terminal velocity)
         self.physics.reset(
-            altitude=self.config.initial_altitude,
-            velocity=self.config.initial_velocity
+            altitude=self.config.initial_altitude
         )
         if self.guidance:
             self.guidance.reset()
@@ -97,6 +110,7 @@ class GameSession:
             self.running = True
             self.paused = False
             self.start_time = time.time()
+            self.flight_recorder.start_recording()
     
     def pause(self):
         """Pause the game."""
@@ -182,7 +196,7 @@ class GameSession:
             aerodynamics_model=self.physics.aerodynamics
         )
         
-        return {
+        state = {
             "session_id": self.session_id,
             "mode": self.config.mode.value,
             "running": self.running,
@@ -191,3 +205,15 @@ class GameSession:
             "score": self.score,
             "rocket": rocket_state,
         }
+        
+        # Include flight review data if game is over
+        is_game_over = rocket_state.get("landed", False) or rocket_state.get("crashed", False)
+        if is_game_over:
+            self.flight_recorder.stop_recording()
+            flight_data = self.flight_recorder.to_dict()
+            # Debug: Print data points count
+            print(f"[FlightRecorder] Game over. Data points: {len(flight_data.get('data_points', []))}")
+            print(f"[FlightRecorder] Events: {len(flight_data.get('events', []))}")
+            state["flight_review"] = flight_data
+        
+        return state

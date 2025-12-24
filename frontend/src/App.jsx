@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
 import useGameStore from './stores/gameStore'
 import useLanguageStore from './stores/languageStore'
@@ -12,12 +12,25 @@ import GameOver from './components/GameOver'
 import LanguageSelector from './components/LanguageSelector'
 
 function App() {
-  const { connect, connected, gameState, showMenu } = useGameStore()
+  const { connect, disconnect, connected, gameState, showMenu } = useGameStore()
   const { language } = useLanguageStore()
   const t = useTranslation(language)
+  const hasConnected = useRef(false)
   
   useEffect(() => {
-    connect()
+    // Prevent multiple connections during development HMR
+    if (!hasConnected.current) {
+      console.log('[App] Initializing WebSocket connection...')
+      hasConnected.current = true
+      connect()
+    }
+    
+    // Cleanup function to disconnect when component unmounts
+    return () => {
+      console.log('[App] Component unmounting, disconnecting...')
+      disconnect()
+      hasConnected.current = false
+    }
   }, [])
   
   const isGameOver = gameState.rocket.landed || gameState.rocket.crashed

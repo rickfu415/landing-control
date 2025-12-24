@@ -11,6 +11,7 @@ const useGameStore = create((set, get) => ({
   connected: false,
   sessionId: null,
   ws: null,
+  shouldReconnect: true,  // Flag to control reconnection behavior
   
   // Previous velocity for acceleration calculation
   prevVelocity: [0, INITIAL_VELOCITY, 0],
@@ -155,47 +156,83 @@ const useGameStore = create((set, get) => ({
   
   // Connect to WebSocket
   connect: () => {
-    const sessionId = Math.random().toString(36).substring(2, 10)
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${window.location.host}/ws/${sessionId}`
+    // Prevent duplicate connections
+    const currentWs = get().ws
+    if (currentWs && (currentWs.readyState === WebSocket.CONNECTING || currentWs.readyState === WebSocket.OPEN)) {
+      console.log('WebSocket already connected or connecting')
+      return
+    }
     
+    const sessionId = Math.random().toString(36).substring(2, 10)
+    
+    // Use relative WebSocket URL to work with Vite proxy
+    // In development: ws://localhost:5173/ws/... -> proxied to ws://localhost:8001/ws/...
+    // In production: uses same host as the page
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const host = window.location.host
+    const wsUrl = `${protocol}//${host}/ws/${sessionId}`
+    
+    console.log('Connecting to WebSocket:', wsUrl)
     const ws = new WebSocket(wsUrl)
     
+    // Enable reconnection when connecting
+    set({ shouldReconnect: true })
+    
     ws.onopen = () => {
-      console.log('Connected to game server')
+      console.log('[WS] Connected to game server')
       set({ connected: true, sessionId, ws })
     }
     
     ws.onmessage = (event) => {
-      const message = JSON.parse(event.data)
-      
-      if (message.type === 'state' || message.type === 'connected' || 
-          message.type === 'started' || message.type === 'reset') {
-        if (message.data) {
-          const currentState = get().gameState
-          set({ 
-            gameState: message.data,
-            prevVelocity: currentState.rocket.velocity
-          })
+      try {
+        console.log('[WS] Received message:', event.data.substring(0, 100) + '...')
+        const message = JSON.parse(event.data)
+        console.log('[WS] Message type:', message.type)
+        
+        if (message.type === 'state' || message.type === 'connected' || 
+            message.type === 'started' || message.type === 'reset') {
+          if (message.data) {
+            const currentState = get().gameState
+            set({ 
+              gameState: message.data,
+              prevVelocity: currentState.rocket.velocity
+            })
+            console.log('[WS] State updated successfully')
+          }
         }
+      } catch (error) {
+        console.error('[WS] Error processing message:', error)
       }
     }
     
-    ws.onclose = () => {
-      console.log('Disconnected from game server')
+    ws.onclose = (event) => {
+      console.log('[WS] Connection closed. Code:', event.code, 'Reason:', event.reason, 'Clean:', event.wasClean)
       set({ connected: false, ws: null })
-      // Attempt to reconnect after 2 seconds
-      setTimeout(() => get().connect(), 2000)
+      
+      // Only attempt to reconnect if shouldReconnect flag is true
+      const { shouldReconnect } = get()
+      if (shouldReconnect) {
+        console.log('[WS] Attempting to reconnect in 2 seconds...')
+        setTimeout(() => {
+          if (get().shouldReconnect) {
+            get().connect()
+          }
+        }, 2000)
+      }
     }
     
     ws.onerror = (error) => {
-      console.error('WebSocket error:', error)
+      console.error('[WS] WebSocket error:', error)
     }
   },
   
   disconnect: () => {
     const { ws } = get()
+    // Disable reconnection before closing
+    set({ shouldReconnect: false })
+    
     if (ws) {
+      console.log('Closing WebSocket connection')
       ws.close()
       set({ connected: false, ws: null, sessionId: null })
     }

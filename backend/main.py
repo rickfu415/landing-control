@@ -5,6 +5,7 @@ FastAPI application with WebSocket support for real-time game simulation.
 
 import asyncio
 import uuid
+import logging
 from typing import Dict
 from contextlib import asynccontextmanager
 
@@ -13,6 +14,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from game.session import GameSession, GameConfig, GameMode
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 # Store active game sessions
@@ -198,22 +203,27 @@ async def game_input(session_id: str, request: GameInputRequest):
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
     """WebSocket endpoint for real-time game communication."""
+    logger.info(f"WebSocket connection attempt for session: {session_id}")
     await websocket.accept()
+    logger.info(f"WebSocket accepted for session: {session_id}")
     
     # Create session if it doesn't exist
     if session_id not in sessions:
         config = GameConfig(mode=GameMode.MANUAL)
         sessions[session_id] = GameSession(session_id, config)
+        logger.info(f"Created new session: {session_id}")
     
     connections[session_id] = websocket
     
     try:
         # Send initial state
+        logger.info(f"Sending initial state to session: {session_id}")
         await websocket.send_json({
             "type": "connected",
             "session_id": session_id,
             "data": sessions[session_id].get_state()
         })
+        logger.info(f"Initial state sent to session: {session_id}")
         
         while True:
             # Receive messages from client
@@ -317,10 +327,11 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     
     except WebSocketDisconnect:
         # Clean up on disconnect
+        logger.info(f"WebSocket disconnected for session: {session_id}")
         if session_id in connections:
             del connections[session_id]
     except Exception as e:
-        print(f"WebSocket error: {e}")
+        logger.error(f"WebSocket error for session {session_id}: {e}", exc_info=True)
         if session_id in connections:
             del connections[session_id]
 

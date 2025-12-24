@@ -102,20 +102,20 @@ function HUD() {
   
   return (
     <div className="absolute inset-0 pointer-events-none">
-      {/* Top center - Phase indicator */}
+      {/* Mission Time - Top Center */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2">
-        <div className="hud-panel px-6 py-2 rounded-lg">
+        <div className="bg-black/30 backdrop-blur-sm px-6 py-2 rounded-lg border border-gray-700/50">
           <div className="text-center">
-            <span className="text-xs text-gray-400 uppercase tracking-wider">{t.hud.phase}</span>
-            <div className="text-lg font-display font-bold text-rocket-orange uppercase">
-              {getPhase(rocket.phase)}
+            <span className="text-[10px] text-gray-400 uppercase tracking-wider">{t.hud.missionTime}</span>
+            <div className="text-3xl font-display font-black text-white font-mono">
+              {time.toFixed(1)}<span className="text-sm text-gray-400">s</span>
             </div>
           </div>
         </div>
       </div>
-      
+
       {/* Left panel - Telemetry */}
-      <div className="absolute top-20 left-4 w-56">
+      <div className="absolute top-4 left-4 w-56">
         <div className="hud-panel p-3 rounded-lg">
           <h3 className="text-xs uppercase tracking-wider text-gray-400 mb-2 font-display">
             {t.hud.telemetry}
@@ -150,31 +150,32 @@ function HUD() {
             unit="m/s" 
             max={200}
           />
+          
+          <div className="mt-2 pt-2 border-t border-gray-700">
+            <StatRow label={t.hud.acceleration} value={totalAccel.toFixed(1)} unit="m/s²" />
+            <StatRow label={t.hud.gForce} value={gForce.toFixed(2)} unit="G" warning={gForce > 3} />
+            <StatRow label={t.hud.twr} value={twr.toFixed(2)} unit="" warning={twr > 0 && twr < 1} />
+            <StatRow label={t.hud.distToPad} value={distanceFromPad.toFixed(1)} unit="m" warning={distanceFromPad > 30} />
+            <StatRow 
+              label={t.hud.timeToImpact} 
+              value={timeToImpact < 1000 ? timeToImpact.toFixed(1) : '---'} 
+              unit="s" 
+              warning={timeToImpact < 10 && timeToImpact > 0}
+            />
+          </div>
         </div>
-        
-        {/* Dynamics */}
-        <div className="hud-panel p-3 rounded-lg mt-2">
+      </div>
+      
+      {/* Right panel - Position & Propulsion */}
+      <div className="absolute top-4 right-4 w-56">
+        {/* Systems - Position & Propulsion combined */}
+        <div className="hud-panel p-3 rounded-lg">
           <h3 className="text-xs uppercase tracking-wider text-gray-400 mb-2 font-display">
-            {t.hud.dynamics}
+            {t.hud.position} & {t.hud.propulsion}
           </h3>
-          <StatRow label={t.hud.acceleration} value={totalAccel.toFixed(1)} unit="m/s²" />
-          <StatRow label={t.hud.gForce} value={gForce.toFixed(2)} unit="G" warning={gForce > 3} />
-          <StatRow label={t.hud.twr} value={twr.toFixed(2)} unit="" warning={twr > 0 && twr < 1} />
-          <StatRow label={t.hud.distToPad} value={distanceFromPad.toFixed(1)} unit="m" warning={distanceFromPad > 30} />
-          <StatRow 
-            label={t.hud.timeToImpact} 
-            value={timeToImpact < 1000 ? timeToImpact.toFixed(1) : '---'} 
-            unit="s" 
-            warning={timeToImpact < 10 && timeToImpact > 0}
-          />
-        </div>
-        
-        {/* Position display */}
-        <div className="hud-panel p-3 rounded-lg mt-2">
-          <h3 className="text-xs uppercase tracking-wider text-gray-400 mb-2 font-display">
-            {t.hud.position}
-          </h3>
-          <div className="grid grid-cols-3 gap-2 text-center">
+          
+          {/* Position */}
+          <div className="grid grid-cols-3 gap-2 text-center mb-2">
             <div>
               <div className="text-[10px] text-gray-500">X</div>
               <div className="text-sm font-mono">{rocket.position[0].toFixed(1)}</div>
@@ -188,110 +189,29 @@ function HUD() {
               <div className="text-sm font-mono">{rocket.position[2].toFixed(1)}</div>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-2 text-center mt-2 pt-2 border-t border-gray-700">
-            <div>
-              <div className="text-[10px] text-gray-500">Vx</div>
-              <div className="text-xs font-mono">{rocket.velocity[0].toFixed(1)}</div>
-            </div>
-            <div>
-              <div className="text-[10px] text-gray-500">Vy</div>
-              <div className="text-xs font-mono">{rocket.velocity[1].toFixed(1)}</div>
-            </div>
-            <div>
-              <div className="text-[10px] text-gray-500">Vz</div>
-              <div className="text-xs font-mono">{rocket.velocity[2].toFixed(1)}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Right panel - Timer & Systems */}
-      <div className="absolute top-20 right-4 w-56">
-        {/* Timer - prominent display */}
-        <div className="hud-panel p-4 rounded-lg mb-2">
-          <div className="text-center">
-            <span className="text-xs text-gray-400 uppercase tracking-wider">{t.hud.missionTime}</span>
-            <div className="text-4xl font-display font-black text-white font-mono mt-1">
-              {time.toFixed(1)}<span className="text-lg text-gray-400">s</span>
-            </div>
-          </div>
-          <div className="mt-2 pt-2 border-t border-gray-700 text-center">
-            <span className="text-xs text-gray-400 uppercase tracking-wider">{t.hud.mode}</span>
-            <div className="text-sm font-display text-rocket-blue uppercase">
-              {gameState.mode}
-            </div>
-          </div>
-        </div>
-        
-        {/* Systems */}
-        <div className="hud-panel p-3 rounded-lg">
-          <h3 className="text-xs uppercase tracking-wider text-gray-400 mb-2 font-display">
-            {t.hud.propulsion}
-          </h3>
           
-          <Gauge 
-            label={t.hud.throttle} 
-            value={rocket.throttle * 100} 
-            unit="%" 
-            max={100}
-          />
-          
-          <Gauge 
-            label={t.hud.fuel} 
-            value={rocket.fuel} 
-            unit="kg" 
-            max={maxFuel}
-            warning={rocket.fuel < (maxFuel * 0.25)}
-          />
-          
-          <div className="mt-2 pt-2 border-t border-gray-700">
-            <StatRow label={t.hud.fuelPercent} value={fuelPercent.toFixed(1)} unit="%" warning={fuelPercent < 25} />
-            <StatRow label={t.hud.dryMass} value={dryMass.toLocaleString()} unit="kg" />
-            <StatRow label={t.hud.totalMass} value={totalMass.toFixed(0)} unit="kg" />
-            <StatRow label={t.hud.thrust} value={(rocket.throttle * engineThrustKN).toFixed(0)} unit="kN" />
-            <StatRow label={t.hud.flowRate} value={massFlowRate.toFixed(0)} unit="kg/s" />
-          </div>
-        </div>
-        
-        {/* Attitude */}
-        <div className="hud-panel p-3 rounded-lg mt-2">
-          <h3 className="text-xs uppercase tracking-wider text-gray-400 mb-2 font-display">
-            {t.hud.attitude}
-          </h3>
-          <div className="flex items-center justify-between">
-            <div className="relative w-14 h-14 border border-gray-600 rounded-full">
-              <div 
-                className="absolute w-2 h-2 bg-rocket-orange rounded-full"
-                style={{
-                  left: `${50 + rocket.gimbal[0] * 8}%`,
-                  top: `${50 - rocket.gimbal[1] * 8}%`,
-                  transform: 'translate(-50%, -50%)'
-                }}
-              />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-px h-full bg-gray-700" />
-                <div className="absolute w-full h-px bg-gray-700" />
-              </div>
-            </div>
-            <div className="text-right">
-              <StatRow label={t.hud.gimbalP} value={rocket.gimbal[0].toFixed(1)} unit="°" />
-              <StatRow label={t.hud.gimbalY} value={rocket.gimbal[1].toFixed(1)} unit="°" />
-              <div className="flex justify-between text-xs py-0.5">
-                <span className="text-gray-400">{t.hud.legs}</span>
-                <span className={rocket.legs_deployed ? 'text-rocket-green' : 'text-gray-500'}>
-                  {rocket.legs_deployed ? t.hud.legsDeployed : t.hud.legsStowed}
-                </span>
-              </div>
+          <div className="border-t border-gray-700 pt-2 mt-2">
+            <Gauge 
+              label={t.hud.throttle} 
+              value={rocket.throttle * 100} 
+              unit="%" 
+              max={100}
+            />
+            
+            <Gauge 
+              label={t.hud.fuel} 
+              value={rocket.fuel} 
+              unit="kg" 
+              max={maxFuel}
+              warning={rocket.fuel < (maxFuel * 0.25)}
+            />
+            
+            <div className="mt-2 pt-2 border-t border-gray-700">
+              <StatRow label={t.hud.fuelPercent} value={fuelPercent.toFixed(1)} unit="%" warning={fuelPercent < 25} />
+              <StatRow label={t.hud.thrust} value={(rocket.throttle * engineThrustKN).toFixed(0)} unit="kN" />
+              <StatRow label={t.hud.totalMass} value={totalMass.toFixed(0)} unit="kg" />
             </div>
           </div>
-        </div>
-      </div>
-      
-      {/* Camera controls hint */}
-      <div className="absolute top-4 right-72">
-        <div className="text-[10px] text-gray-500 text-right bg-black/30 px-2 py-1 rounded">
-          {t.hud.cameraHint}<br/>
-          {t.hud.zoomHint}
         </div>
       </div>
       

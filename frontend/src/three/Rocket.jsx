@@ -8,48 +8,48 @@ function EngineFlame({ throttle }) {
   const innerFlameRef = useRef()
   
   useFrame((state) => {
-    if (flameRef.current && throttle > 0) {
-      // Animate flame with pulsing effect
-      const pulse = 0.8 + Math.sin(state.clock.elapsedTime * 30) * 0.2
-      
-      // Scale both length and width with throttle
-      const length = throttle * 15 * pulse
-      const width = 0.5 + throttle * 1.0  // Width scales from 0.5 to 1.5
-      
-      flameRef.current.scale.set(width, length, width)
-      flameRef.current.position.y = -length / 2 - 2
-      
-      if (innerFlameRef.current) {
-        const innerWidth = width * 0.6
-        innerFlameRef.current.scale.set(innerWidth, length * 0.8, innerWidth)
-        innerFlameRef.current.position.y = -length * 0.4 - 2
+    if (flameRef.current) {
+      if (throttle > 0.01) {
+        // Animate flame with pulsing effect
+        const pulse = 0.8 + Math.sin(state.clock.elapsedTime * 30) * 0.2
+        
+        // Scale both length and width with throttle
+        const length = throttle * 15 * pulse
+        const width = 0.5 + throttle * 1.0  // Width scales from 0.5 to 1.5
+        
+        flameRef.current.scale.set(width, length, width)
+        flameRef.current.position.y = -length / 2  // Start directly from nozzle
+        flameRef.current.visible = true
+        
+        if (innerFlameRef.current) {
+          const innerWidth = width * 0.6
+          innerFlameRef.current.scale.set(innerWidth, length * 0.8, innerWidth)
+          innerFlameRef.current.position.y = -length * 0.4  // Inner flame follows
+          innerFlameRef.current.visible = true
+        }
+      } else {
+        // Hide flames when throttle is zero
+        flameRef.current.visible = false
+        if (innerFlameRef.current) {
+          innerFlameRef.current.visible = false
+        }
       }
     }
   })
   
-  if (throttle <= 0) return null
-  
   return (
     <group>
-      {/* Outer flame (orange) */}
+      {/* Outer flame (orange) - cone without base cap */}
       <mesh ref={flameRef}>
-        <coneGeometry args={[1.5, 1, 16]} />
-        <meshBasicMaterial color="#ff6b35" transparent opacity={0.7 + throttle * 0.2} />
+        <coneGeometry args={[1.0, 2, 16, 1, true]} />
+        <meshBasicMaterial color="#ff6b35" transparent opacity={0.7 + throttle * 0.2} side={THREE.DoubleSide} />
       </mesh>
       
       {/* Inner flame (bright yellow) */}
       <mesh ref={innerFlameRef}>
-        <coneGeometry args={[0.8, 1, 16]} />
-        <meshBasicMaterial color="#ffff00" transparent opacity={0.8 + throttle * 0.2} />
+        <coneGeometry args={[0.6, 2, 16, 1, true]} />
+        <meshBasicMaterial color="#ffff00" transparent opacity={0.8 + throttle * 0.2} side={THREE.DoubleSide} />
       </mesh>
-      
-      {/* Point light for illumination - scales with throttle */}
-      <pointLight 
-        position={[0, -5 * throttle, 0]} 
-        intensity={throttle * 80} 
-        color="#ff6b35" 
-        distance={50 + throttle * 100}
-      />
     </group>
   )
 }
@@ -182,34 +182,9 @@ function AirParticles({ velocity, altitude }) {
   )
 }
 
-function ReentryGlow({ velocity, altitude }) {
-  const glowRef = useRef()
-  const speed = Math.sqrt(velocity[0]**2 + velocity[1]**2 + velocity[2]**2)
-  
-  useFrame(() => {
-    if (glowRef.current) {
-      // Pulsing glow effect
-      const pulse = 0.8 + Math.sin(Date.now() * 0.01) * 0.2
-      glowRef.current.material.opacity = Math.min((speed - 100) / 200, 0.5) * pulse
-    }
-  })
-  
-  // Only show reentry glow at very high speeds
-  if (speed < 100 || altitude < 100) return null
-  
-  const glowSize = 3 + (speed - 100) * 0.01
-  
-  return (
-    <mesh ref={glowRef} position={[0, -15, 0]}>
-      <sphereGeometry args={[glowSize, 16, 16]} />
-      <meshBasicMaterial 
-        color="#ff4400" 
-        transparent 
-        opacity={0.3}
-        side={THREE.BackSide}
-      />
-    </mesh>
-  )
+function ReentryGlow({ velocity, altitude, throttle }) {
+  // Disabled - no reentry glow effect
+  return null
 }
 
 function LandingLeg({ position, rotation, deployed }) {
@@ -290,11 +265,6 @@ function Rocket() {
   
   return (
     <group ref={rocketRef}>
-      {/* Velocity-based effects */}
-      <VelocityStreaks velocity={velocity} altitude={altitude} />
-      <AirParticles velocity={velocity} altitude={altitude} />
-      <ReentryGlow velocity={velocity} altitude={altitude} />
-      
       {/* Main body (first stage) */}
       <mesh position={[0, rocketCenter, 0]}>
         <cylinderGeometry args={[rocketRadius, rocketRadius, rocketHeight, 32]} />
@@ -311,14 +281,14 @@ function Rocket() {
         <meshStandardMaterial color="#222222" metalness={0.3} roughness={0.7} />
       </mesh>
       
-      {/* Engine section - wider at bottom */}
-      <mesh position={[0, rocketHeight * -0.126, 0]}>
+      {/* Engine section - wider at bottom, connects to main body */}
+      <mesh position={[0, rocketHeight * -0.063, 0]}>
         <cylinderGeometry args={[rocketRadius, rocketRadius * 1.2, rocketHeight * 0.126, 32]} />
         <meshStandardMaterial color="#333333" metalness={0.8} roughness={0.2} />
       </mesh>
       
-      {/* Engine nozzle */}
-      <mesh position={[0, rocketHeight * -0.21, 0]}>
+      {/* Engine nozzle - positioned to connect with engine section */}
+      <mesh position={[0, rocketHeight * -0.1575, 0]}>
         <cylinderGeometry args={[rocketRadius * 0.55, rocketRadius * 0.82, rocketHeight * 0.063, 16]} />
         <meshStandardMaterial color="#222222" metalness={0.9} roughness={0.1} />
       </mesh>
@@ -357,8 +327,8 @@ function Rocket() {
         deployed={legs_deployed} 
       />
       
-      {/* Engine flame */}
-      <group position={[0, rocketHeight * -0.23, 0]}>
+      {/* Engine flame - positioned at bottom of nozzle */}
+      <group position={[0, rocketHeight * -0.189, 0]}>
         <EngineFlame throttle={throttle} />
       </group>
     </group>

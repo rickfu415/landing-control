@@ -38,45 +38,52 @@ function Controls() {
     if (paused) return
     
     switch(e.key.toLowerCase()) {
+      // WSAD for gimbal control
       case 'w':
-      case 'arrowup':
-        setThrottle(Math.min(1, throttle + 0.05))
+        setGimbal([0, 2])  // Gimbal up
         break
       case 's':
-      case 'arrowdown':
-        setThrottle(Math.max(0, throttle - 0.05))
+        setGimbal([0, -2])  // Gimbal down
         break
       case 'a':
-      case 'arrowleft':
-        setGimbal([-2, 0])
+        setGimbal([-2, 0])  // Gimbal left
         break
       case 'd':
-      case 'arrowright':
-        setGimbal([2, 0])
+        setGimbal([2, 0])  // Gimbal right
         break
       case 'q':
-        setGimbal([0, -2])
+        setGimbal([-2, 2])  // Gimbal diagonal up-left
         break
       case 'e':
-        setGimbal([0, 2])
+        setGimbal([2, 2])  // Gimbal diagonal up-right
+        break
+      // Arrow keys for throttle
+      case 'arrowup':
+        setThrottle(1)  // Full throttle while holding
+        break
+      case 'arrowdown':
+        setThrottle(0)  // Cut throttle
         break
       case ' ':
-        setThrottle(1)
-        break
-      case 'x':
-        setThrottle(0)
+        setThrottle(1)  // Space for full throttle
         break
       case 'r':
         resetGame()
         break
     }
-  }, [running, paused, throttle, isGameOver, showMenu])
+  }, [running, paused, isGameOver, showMenu])
   
   const handleKeyUp = useCallback((e) => {
     if (!running || isGameOver || showMenu || paused) return
     
-    if (['a', 'd', 'q', 'e', 'arrowleft', 'arrowright'].includes(e.key.toLowerCase())) {
+    // Reset gimbal when releasing WSAD/QE keys
+    if (['w', 'a', 's', 'd', 'q', 'e'].includes(e.key.toLowerCase())) {
       setGimbal([0, 0])
+    }
+    
+    // Reset throttle when releasing arrow keys or space (realistic handle behavior)
+    if (['arrowup', 'arrowdown', ' '].includes(e.key.toLowerCase())) {
+      setThrottle(0)
     }
   }, [running, isGameOver, showMenu, paused])
   
@@ -93,106 +100,182 @@ function Controls() {
   if (!running || isGameOver) return null
   
   return (
-    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-auto">
-      <div className="hud-panel p-4 rounded-lg flex items-center gap-6">
-        {/* Throttle control */}
-        <div className="flex items-center gap-4">
+    <>
+      {/* Gimbal control - LEFT */}
+      <div className="absolute bottom-4 left-4 pointer-events-auto">
+        <div className="hud-panel p-4 rounded-lg">
           <div className="text-center">
-            <label className="text-xs text-gray-400 block mb-2 uppercase tracking-wider">{t.controls.throttle}</label>
-            <div className="flex items-center gap-3">
+            <label className="text-xs text-gray-400 block mb-2 uppercase tracking-wider">{t.controls.gimbal}</label>
+            <div className="grid grid-cols-3 gap-1">
+              <div></div>
               <button
-                onClick={() => setThrottle(0)}
-                className="w-10 h-10 rounded bg-red-900/50 border border-red-500/50 text-red-400 
-                         hover:bg-red-800/50 transition-colors text-xs font-bold"
+                onMouseDown={() => setGimbal([0, 2])}
+                onMouseUp={() => setGimbal([0, 0])}
+                onMouseLeave={() => setGimbal([0, 0])}
+                className="w-10 h-10 rounded bg-space-700 border border-gray-600 text-gray-300 
+                         hover:bg-space-800 hover:border-rocket-orange transition-colors text-sm"
               >
-                {t.controls.cut}
+                ▲
               </button>
-              <div className="relative w-32">
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={throttle}
-                  onChange={(e) => setThrottle(parseFloat(e.target.value))}
-                  className="w-full h-3 bg-space-700 rounded-lg appearance-none cursor-pointer"
+              <div></div>
+              <button
+                onMouseDown={() => setGimbal([-2, 0])}
+                onMouseUp={() => setGimbal([0, 0])}
+                onMouseLeave={() => setGimbal([0, 0])}
+                className="w-10 h-10 rounded bg-space-700 border border-gray-600 text-gray-300 
+                         hover:bg-space-800 hover:border-rocket-orange transition-colors text-sm"
+              >
+                ◀
+              </button>
+              {/* Center with stick indicator */}
+              <div className="w-10 h-10 rounded bg-space-800 border border-gray-700 flex items-center justify-center relative">
+                {/* Crosshair */}
+                <div className="absolute w-full h-px bg-gray-600"></div>
+                <div className="absolute h-full w-px bg-gray-600"></div>
+                {/* Stick indicator */}
+                <div 
+                  className="absolute w-3 h-3 bg-rocket-orange rounded-full transition-all duration-100 shadow-lg"
                   style={{
-                    background: `linear-gradient(to right, #ff6b35 0%, #ff6b35 ${throttle * 100}%, #1a1a25 ${throttle * 100}%, #1a1a25 100%)`
+                    transform: `translate(${gameState.rocket.gimbal[0] * 12}px, ${-gameState.rocket.gimbal[1] * 12}px)`
                   }}
-                />
-                <div className="text-center text-lg font-mono text-white mt-1 font-bold">
-                  {(throttle * 100).toFixed(0)}%
+                >
+                  {/* Stick line */}
+                  <svg className="absolute inset-0 w-full h-full" style={{ overflow: 'visible' }}>
+                    <line 
+                      x1="6" 
+                      y1="6" 
+                      x2={6 - gameState.rocket.gimbal[0] * 12} 
+                      y2={6 + gameState.rocket.gimbal[1] * 12}
+                      stroke="#ff6b35" 
+                      strokeWidth="2"
+                    />
+                  </svg>
                 </div>
               </div>
               <button
-                onClick={() => setThrottle(1)}
-                className="w-10 h-10 rounded bg-green-900/50 border border-green-500/50 text-green-400 
-                         hover:bg-green-800/50 transition-colors text-xs font-bold"
+                onMouseDown={() => setGimbal([2, 0])}
+                onMouseUp={() => setGimbal([0, 0])}
+                onMouseLeave={() => setGimbal([0, 0])}
+                className="w-10 h-10 rounded bg-space-700 border border-gray-600 text-gray-300 
+                         hover:bg-space-800 hover:border-rocket-orange transition-colors text-sm"
               >
-                {t.controls.max}
+                ▶
               </button>
+              <div></div>
+              <button
+                onMouseDown={() => setGimbal([0, -2])}
+                onMouseUp={() => setGimbal([0, 0])}
+                onMouseLeave={() => setGimbal([0, 0])}
+                className="w-10 h-10 rounded bg-space-700 border border-gray-600 text-gray-300 
+                         hover:bg-space-800 hover:border-rocket-orange transition-colors text-sm"
+              >
+                ▼
+              </button>
+              <div></div>
+            </div>
+            <div className="text-[10px] text-gray-500 mt-2">
+              WSAD/QE or click
             </div>
           </div>
         </div>
-        
-        {/* Divider */}
-        <div className="w-px h-16 bg-gray-700" />
-        
-        {/* Gimbal controls */}
-        <div className="text-center">
-          <label className="text-xs text-gray-400 block mb-2 uppercase tracking-wider">{t.controls.gimbal}</label>
-          <div className="grid grid-cols-3 gap-1">
-            <div></div>
-            <button
-              onMouseDown={() => setGimbal([0, 2])}
-              onMouseUp={() => setGimbal([0, 0])}
-              onMouseLeave={() => setGimbal([0, 0])}
-              className="w-8 h-8 rounded bg-space-700 border border-gray-600 text-gray-300 
-                       hover:bg-space-800 hover:border-rocket-orange transition-colors text-xs"
-            >
-              ▲
-            </button>
-            <div></div>
-            <button
-              onMouseDown={() => setGimbal([-2, 0])}
-              onMouseUp={() => setGimbal([0, 0])}
-              onMouseLeave={() => setGimbal([0, 0])}
-              className="w-8 h-8 rounded bg-space-700 border border-gray-600 text-gray-300 
-                       hover:bg-space-800 hover:border-rocket-orange transition-colors text-xs"
-            >
-              ◀
-            </button>
-            <div className="w-8 h-8 rounded bg-space-800 border border-gray-700 flex items-center justify-center">
-              <div className="w-2 h-2 bg-rocket-orange rounded-full"></div>
+      </div>
+      
+      {/* Throttle control - RIGHT (vertical handle) */}
+      <div className="absolute bottom-4 right-4 pointer-events-auto">
+        <div className="hud-panel p-4 rounded-lg">
+          <div className="text-center">
+            <label className="text-xs text-gray-400 block mb-2 uppercase tracking-wider">{t.controls.throttle}</label>
+            <div className="flex items-center gap-3">
+              {/* Percentage bar (result display) */}
+              <div className="relative">
+                <div className="w-6 h-40 bg-space-800 rounded border border-gray-700 relative overflow-hidden">
+                  {/* Fill indicator */}
+                  <div 
+                    className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-rocket-orange to-yellow-500 transition-all duration-100"
+                    style={{ height: `${throttle * 100}%` }}
+                  />
+                  
+                  {/* Tick marks */}
+                  {[0, 50, 100].map((mark) => (
+                    <div 
+                      key={mark}
+                      className="absolute left-0 right-0 border-t border-gray-600"
+                      style={{ bottom: `${mark}%` }}
+                    />
+                  ))}
+                </div>
+                {/* Percentage display */}
+                <div className="text-sm font-mono text-white font-bold mt-1">
+                  {(throttle * 100).toFixed(0)}%
+                </div>
+              </div>
+              
+              {/* Throttle handle/stick (interactive) */}
+              <div className="relative h-40 w-12 flex items-end">
+                {/* Track/slot for the handle */}
+                <div className="absolute left-1/2 -translate-x-1/2 w-1.5 h-full bg-space-900 rounded-full border border-gray-700"></div>
+                
+                {/* Draggable handle */}
+                <div 
+                  className="absolute left-1/2 w-12 cursor-grab active:cursor-grabbing"
+                  style={{ 
+                    bottom: `${throttle * 100}%`,
+                    transform: `translate(-50%, 50%)`
+                  }}
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    const trackRect = e.currentTarget.parentElement.getBoundingClientRect()
+                    
+                    const handleMouseMove = (moveEvent) => {
+                      const y = trackRect.bottom - moveEvent.clientY
+                      const percentage = Math.max(0, Math.min(1, y / trackRect.height))
+                      setThrottle(percentage)
+                    }
+                    
+                    const handleMouseUp = () => {
+                      setThrottle(0)
+                      document.removeEventListener('mousemove', handleMouseMove)
+                      document.removeEventListener('mouseup', handleMouseUp)
+                    }
+                    
+                    document.addEventListener('mousemove', handleMouseMove)
+                    document.addEventListener('mouseup', handleMouseUp)
+                    
+                    // Set initial position
+                    handleMouseMove(e)
+                  }}
+                >
+                  {/* Handle grip */}
+                  <div className="relative">
+                    {/* Connecting rod */}
+                    <div className="absolute left-1/2 -translate-x-1/2 w-0.5 h-4 bg-gray-600 -top-4"></div>
+                    
+                    {/* Handle knob */}
+                    <div className="w-12 h-8 bg-gradient-to-b from-gray-700 to-gray-800 rounded border-2 border-gray-600 shadow-lg
+                                  flex items-center justify-center relative overflow-hidden">
+                      {/* Grip texture */}
+                      <div className="absolute inset-0 flex flex-col justify-around py-1.5">
+                        {[...Array(3)].map((_, i) => (
+                          <div key={i} className="h-px bg-gray-600 mx-1.5"></div>
+                        ))}
+                      </div>
+                      {/* Center indicator */}
+                      <div className="w-2 h-2 rounded-full bg-rocket-orange shadow-lg z-10"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <button
-              onMouseDown={() => setGimbal([2, 0])}
-              onMouseUp={() => setGimbal([0, 0])}
-              onMouseLeave={() => setGimbal([0, 0])}
-              className="w-8 h-8 rounded bg-space-700 border border-gray-600 text-gray-300 
-                       hover:bg-space-800 hover:border-rocket-orange transition-colors text-xs"
-            >
-              ▶
-            </button>
-            <div></div>
-            <button
-              onMouseDown={() => setGimbal([0, -2])}
-              onMouseUp={() => setGimbal([0, 0])}
-              onMouseLeave={() => setGimbal([0, 0])}
-              className="w-8 h-8 rounded bg-space-700 border border-gray-600 text-gray-300 
-                       hover:bg-space-800 hover:border-rocket-orange transition-colors text-xs"
-            >
-              ▼
-            </button>
-            <div></div>
+            <div className="text-[10px] text-gray-500 mt-2">
+              Drag or ↑↓ arrows
+            </div>
           </div>
         </div>
-        
-        {/* Divider */}
-        <div className="w-px h-16 bg-gray-700" />
-        
-        {/* Action buttons */}
-        <div className="flex gap-2">
+      </div>
+      
+      {/* Center - Action buttons */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-auto">
+        <div className="hud-panel p-3 rounded-lg flex gap-2">
           <button
             onClick={() => paused ? resumeGame() : pauseGame()}
             className={`px-4 py-2 rounded font-display font-bold text-sm uppercase tracking-wider transition-all
@@ -210,19 +293,8 @@ function Controls() {
             {t.controls.reset}
           </button>
         </div>
-        
-        {/* Divider */}
-        <div className="w-px h-16 bg-gray-700" />
-        
-        {/* Keyboard hints */}
-        <div className="text-[10px] text-gray-500 space-y-0.5">
-          <div>{t.controls.hints.throttle}</div>
-          <div>{t.controls.hints.gimbal}</div>
-          <div>{t.controls.hints.throttleKeys}</div>
-          <div>{t.controls.hints.gameKeys}</div>
-        </div>
       </div>
-    </div>
+    </>
   )
 }
 

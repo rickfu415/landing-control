@@ -25,6 +25,7 @@ class GameConfig:
     # initial_velocity is now calculated from terminal velocity (not fixed)
     wind_level: int = 0  # Beaufort scale level (1-9), 0 = no wind (default)
     rocket_preset: str = "falcon9_block5_landing"  # Rocket configuration preset
+    difficulty: str = "medium"  # Difficulty level: 'easy', 'medium', 'professional'
 
 
 class GameSession:
@@ -60,7 +61,7 @@ class GameSession:
         self.flight_recorder = FlightRecorder(sample_interval=0.05)  # Record every 0.05 seconds (20 Hz)
         
         # Initialize subsystems
-        self.physics = PhysicsEngine(rocket_config=rocket_config, wind_config=wind_config, flight_recorder=self.flight_recorder)
+        self.physics = PhysicsEngine(rocket_config=rocket_config, wind_config=wind_config, flight_recorder=self.flight_recorder, difficulty=self.config.difficulty)
         self.guidance = None  # Lazy load to avoid circular import
         
         # Game state

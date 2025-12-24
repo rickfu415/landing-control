@@ -60,7 +60,8 @@ function GameOver() {
           <div className="hud-panel p-3 rounded-lg">
             <div className="text-xs text-gray-400">{t.gameOver.finalPosition}</div>
             <div className="text-sm font-mono text-white">
-              X: {rocket.position[0].toFixed(1)}m
+              X: {rocket.position[0].toFixed(1)}m<br/>
+              Y: {rocket.position[1].toFixed(1)}m
             </div>
           </div>
           <div className="hud-panel p-3 rounded-lg">

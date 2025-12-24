@@ -4,10 +4,14 @@ import useLanguageStore from '../stores/languageStore'
 import { useTranslation } from '../i18n/translations'
 
 function ThrustProfilePlanner({ inMenu = false }) {
-  const { gameState, setThrottle, thrustProfile, setThrustProfile, thrustProfileActive, setThrustProfileActive } = useGameStore()
+  const { gameState, setThrottle, thrustProfile, setThrustProfile, thrustProfileActive, setThrustProfileActive, gameAttempts } = useGameStore()
   const { language } = useLanguageStore()
   const t = useTranslation(language)
   const [isOpen, setIsOpen] = useState(inMenu) // Auto-open in menu
+  
+  // Thrust profile unlocks after 5 attempts
+  const MIN_ATTEMPTS_TO_UNLOCK = 5
+  const isUnlocked = gameAttempts >= MIN_ATTEMPTS_TO_UNLOCK
   
   // Use global state for profile and active status
   const profile = thrustProfile || [
@@ -53,6 +57,9 @@ function ThrustProfilePlanner({ inMenu = false }) {
     // Apply throttle (convert percentage to 0-1)
     setThrottle(targetThrottle / 100)
   }, [time, isActive, running, isGameOver, profile, setThrottle])
+  
+  // Hide during active gameplay (only show in menu or when game is over)
+  if (!inMenu && running && !isGameOver) return null
   
   // Add new waypoint
   const addWaypoint = () => {
@@ -109,6 +116,9 @@ function ThrustProfilePlanner({ inMenu = false }) {
     }
   }
   
+  // Hide until unlocked (after 5 attempts)
+  if (!isUnlocked) return null
+  
   // Only hide if in-game and game is over (don't hide in menu)
   if (!inMenu && (!running || isGameOver)) return null
   
@@ -145,6 +155,7 @@ function ThrustProfilePlanner({ inMenu = false }) {
               {inMenu && <span className="text-rocket-orange">📈</span>}
               {!inMenu && '📈 '}
               {t.thrustProfile?.title || 'Thrust Profile'}
+              {inMenu && <span className="ml-2 text-xs text-rocket-green">🔓 {t.thrustProfile?.unlocked || 'Unlocked'}</span>}
             </h3>
             {!inMenu && (
               <button

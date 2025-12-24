@@ -60,11 +60,13 @@ const useGameStore = create((set, get) => ({
     { time: 20, throttle: 100 },
   ],
   thrustProfileActive: false,
+  gameAttempts: 0,  // Track number of game attempts
   
   // UI state
   showMenu: true,
   gameMode: 'manual',
   rocketPreset: 'falcon9_block5_landing',
+  difficulty: 'medium',  // 'easy', 'medium', 'professional'
   
   // Actions
   setConnected: (connected) => set({ connected }),
@@ -106,17 +108,21 @@ const useGameStore = create((set, get) => ({
   setShowMenu: (showMenu) => set({ showMenu }),
   setGameMode: (gameMode) => set({ gameMode }),
   setRocketPreset: (rocketPreset) => set({ rocketPreset }),
+  setDifficulty: (difficulty) => set({ difficulty }),
   
   setThrustProfile: (thrustProfile) => set({ thrustProfile }),
   setThrustProfileActive: (thrustProfileActive) => set({ thrustProfileActive }),
   
   // Game control actions
   startGame: () => {
-    const { ws, connected, gameMode, rocketPreset } = get()
+    const { ws, connected, gameMode, rocketPreset, difficulty, gameAttempts } = get()
     if (ws && connected) {
-      ws.send(JSON.stringify({ type: 'config', mode: gameMode, rocket_preset: rocketPreset }))
+      ws.send(JSON.stringify({ type: 'config', mode: gameMode, rocket_preset: rocketPreset, difficulty: difficulty }))
       ws.send(JSON.stringify({ type: 'start' }))
-      set({ showMenu: false })
+      set({ 
+        showMenu: false,
+        gameAttempts: gameAttempts + 1  // Increment attempts counter
+      })
     }
   },
   

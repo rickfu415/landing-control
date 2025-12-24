@@ -158,7 +158,7 @@ class RocketState:
 class PhysicsEngine:
     """Main physics simulation engine."""
     
-    def __init__(self, rocket_config: RocketConfig = None, wind_config: WindConfig = None, use_6dof: bool = True, flight_recorder=None):
+    def __init__(self, rocket_config: RocketConfig = None, wind_config: WindConfig = None, use_6dof: bool = True, flight_recorder=None, difficulty: str = "medium"):
         self.dt = 1.0 / PHYSICS_TICK_RATE
         self.atmosphere = Atmosphere()
         self.geometry = RocketGeometry(config=rocket_config)
@@ -166,6 +166,7 @@ class PhysicsEngine:
         self.aerodynamics = AerodynamicsModel()
         self.dynamics = RigidBodyDynamics(geometry=self.geometry)
         self.torque_calculator = TorqueCalculator(geometry=self.geometry)
+        self.difficulty = difficulty  # Store difficulty level
         
         # Calculate initial velocity based on terminal velocity at STARTING altitude
         # At terminal velocity, drag = weight, so rocket maintains constant speed
@@ -435,11 +436,29 @@ class PhysicsEngine:
             up_world = self.rotate_vector_by_quaternion(np.array([0.0, 1.0, 0.0]), self.state.orientation)
             tilt_angle = np.degrees(np.arccos(np.clip(up_world[1], -1, 1)))
             
-            # Check landing conditions
-            if (vertical_speed <= MAX_LANDING_VELOCITY_VERTICAL and 
-                horizontal_speed <= MAX_LANDING_VELOCITY_HORIZONTAL and
-                tilt_angle <= MAX_LANDING_ANGLE and
-                horizontal_distance <= LANDING_PAD_RADIUS):
+            # Get difficulty-based landing criteria
+            # Easy: altitude 0-10m, velocity 0-20 m/s
+            # Medium: altitude 0-5m, velocity 0-10 m/s
+            # Professional: altitude 0-1m, velocity 0-5 m/s
+            if self.difficulty == "easy":
+                max_altitude = 10.0
+                max_velocity = 20.0
+            elif self.difficulty == "professional":
+                max_altitude = 1.0
+                max_velocity = 5.0
+            else:  # medium (default)
+                max_altitude = 5.0
+                max_velocity = 10.0
+            
+            # Check landing conditions with difficulty-based criteria
+            # Note: We're checking if the rocket JUST touched down (bottom_altitude <= 0)
+            # The altitude check is whether it's within acceptable range from ground
+            altitude_ok = abs(bottom_altitude) <= max_altitude
+            velocity_ok = total_speed <= max_velocity
+            angle_ok = tilt_angle <= MAX_LANDING_ANGLE
+            position_ok = horizontal_distance <= LANDING_PAD_RADIUS
+            
+            if altitude_ok and velocity_ok and angle_ok and position_ok:
                 self.state.landed = True
                 self.state.phase = "landed"
             else:

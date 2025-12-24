@@ -1,7 +1,13 @@
 import useLanguageStore from '../stores/languageStore'
+import useGameStore from '../stores/gameStore'
 
 function LanguageSelector() {
   const { language, setLanguage } = useLanguageStore()
+  const { showMenu, gameState } = useGameStore()
+  
+  // Only show on menu screen (not during game or game over)
+  const isGameOver = gameState.rocket.landed || gameState.rocket.crashed
+  if (!showMenu || isGameOver) return null
   
   return (
     <div className="absolute top-4 right-4 z-50 pointer-events-auto">

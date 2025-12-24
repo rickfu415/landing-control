@@ -5,7 +5,7 @@ import { getRocketSpecs, formatMass } from '../data/rocketSpecs'
 import ThrustProfilePlanner from './ThrustProfilePlanner'
 
 function Menu() {
-  const { connected, rocketPreset, setRocketPreset, startGame } = useGameStore()
+  const { connected, rocketPreset, setRocketPreset, difficulty, setDifficulty, startGame } = useGameStore()
   const { language } = useLanguageStore()
   const t = useTranslation(language)
   
@@ -59,6 +59,51 @@ function Menu() {
           
           {/* LEFT COLUMN - Configuration */}
           <div className="space-y-6">
+            
+            {/* Difficulty selection */}
+            <div>
+              <label className="text-sm uppercase tracking-wider text-gray-400 mb-3 block font-bold">
+                {t.menu.difficulty}
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={() => setDifficulty('easy')}
+                  className={`p-3 rounded-lg border transition-all text-center ${
+                    difficulty === 'easy'
+                      ? 'border-green-500 bg-green-500/20 text-white shadow-lg shadow-green-500/20'
+                      : 'border-gray-700 bg-space-800 text-gray-400 hover:border-gray-500 hover:bg-space-700'
+                  }`}
+                >
+                  <div className="text-lg mb-1">🟢</div>
+                  <div className="text-sm font-bold">{t.menu.difficulties.easy.label}</div>
+                  <div className="text-[10px] text-gray-500 mt-1">{t.menu.difficulties.easy.desc}</div>
+                </button>
+                <button
+                  onClick={() => setDifficulty('medium')}
+                  className={`p-3 rounded-lg border transition-all text-center ${
+                    difficulty === 'medium'
+                      ? 'border-yellow-500 bg-yellow-500/20 text-white shadow-lg shadow-yellow-500/20'
+                      : 'border-gray-700 bg-space-800 text-gray-400 hover:border-gray-500 hover:bg-space-700'
+                  }`}
+                >
+                  <div className="text-lg mb-1">🟡</div>
+                  <div className="text-sm font-bold">{t.menu.difficulties.medium.label}</div>
+                  <div className="text-[10px] text-gray-500 mt-1">{t.menu.difficulties.medium.desc}</div>
+                </button>
+                <button
+                  onClick={() => setDifficulty('professional')}
+                  className={`p-3 rounded-lg border transition-all text-center ${
+                    difficulty === 'professional'
+                      ? 'border-red-500 bg-red-500/20 text-white shadow-lg shadow-red-500/20'
+                      : 'border-gray-700 bg-space-800 text-gray-400 hover:border-gray-500 hover:bg-space-700'
+                  }`}
+                >
+                  <div className="text-lg mb-1">🔴</div>
+                  <div className="text-sm font-bold">{t.menu.difficulties.professional.label}</div>
+                  <div className="text-[10px] text-gray-500 mt-1">{t.menu.difficulties.professional.desc}</div>
+                </button>
+              </div>
+            </div>
             
             {/* Rocket selection */}
             <div>
@@ -218,12 +263,10 @@ function Menu() {
                   </span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <span className="text-rocket-orange text-lg">▸</span>
-                  <span>{t.menu.briefing.landingVelocity}</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="text-rocket-orange text-lg">▸</span>
-                  <span>{t.menu.briefing.padDistance}</span>
+                  <span className={difficulty === 'easy' ? 'text-green-500 text-lg' : difficulty === 'medium' ? 'text-yellow-500 text-lg' : 'text-red-500 text-lg'}>▸</span>
+                  <span className={difficulty === 'easy' ? 'text-green-400' : difficulty === 'medium' ? 'text-yellow-400' : 'text-red-400'}>
+                    {t.menu.briefing.successCriteria[difficulty]}
+                  </span>
                 </li>
               </ul>
             </div>

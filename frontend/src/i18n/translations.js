@@ -6,6 +6,21 @@ export const translations = {
       titleHighlight: 'LANDER',
       subtitle: 'First Stage Landing Simulator',
       rocketSelection: 'Select Rocket',
+      difficulty: 'Difficulty Level',
+      difficulties: {
+        easy: {
+          label: 'Easy',
+          desc: '0-10m, 0-20 m/s'
+        },
+        medium: {
+          label: 'Medium',
+          desc: '0-5m, 0-10 m/s'
+        },
+        professional: {
+          label: 'Professional',
+          desc: '0-1m, 0-5 m/s'
+        }
+      },
       gameMode: 'Game Mode',
       modes: {
         manual: {
@@ -39,7 +54,12 @@ export const translations = {
         initial: 'Initial: 5,000m altitude, -180 m/s descent',
         fuelWarning: 'Only 3,000 kg fuel - be efficient!',
         landingVelocity: 'Land with velocity < 2 m/s vertical',
-        padDistance: 'Stay within 25m of pad center'
+        padDistance: 'Stay within 25m of pad center',
+        successCriteria: {
+          easy: 'Success: Altitude 0-10m, Velocity 0-20 m/s',
+          medium: 'Success: Altitude 0-5m, Velocity 0-10 m/s',
+          professional: 'Success: Altitude 0-1m, Velocity 0-5 m/s'
+        }
       },
       controls: 'Controls',
       controlsHints: {
@@ -183,7 +203,8 @@ export const translations = {
       gentle: 'Gentle',
       aggressive: 'Aggressive',
       hover: 'Hover',
-      timeline: 'Timeline'
+      timeline: 'Timeline',
+      unlocked: 'Unlocked'
     }
   },
   
@@ -194,6 +215,21 @@ export const translations = {
       titleHighlight: '着陆器',
       subtitle: '第一级着陆模拟器',
       rocketSelection: '选择火箭',
+      difficulty: '难度等级',
+      difficulties: {
+        easy: {
+          label: '简单',
+          desc: '0-10米, 0-20 米/秒'
+        },
+        medium: {
+          label: '中等',
+          desc: '0-5米, 0-10 米/秒'
+        },
+        professional: {
+          label: '专业',
+          desc: '0-1米, 0-5 米/秒'
+        }
+      },
       gameMode: '游戏模式',
       modes: {
         manual: {
@@ -227,7 +263,12 @@ export const translations = {
         initial: '初始：5,000米高度，-180 米/秒下降',
         fuelWarning: '仅有 3,000 千克燃料 - 请高效使用！',
         landingVelocity: '着陆时垂直速度 < 2 米/秒',
-        padDistance: '保持在着陆台中心 25 米范围内'
+        padDistance: '保持在着陆台中心 25 米范围内',
+        successCriteria: {
+          easy: '成功标准：高度 0-10米，速度 0-20 米/秒',
+          medium: '成功标准：高度 0-5米，速度 0-10 米/秒',
+          professional: '成功标准：高度 0-1米，速度 0-5 米/秒'
+        }
       },
       controls: '控制',
       controlsHints: {
@@ -371,7 +412,8 @@ export const translations = {
       gentle: '温和',
       aggressive: '激进',
       hover: '悬停',
-      timeline: '时间线'
+      timeline: '时间线',
+      unlocked: '已解锁'
     }
   }
 }

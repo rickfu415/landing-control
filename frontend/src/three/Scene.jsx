@@ -192,14 +192,16 @@ function Scene() {
         color="#FFF8DC"
       />
       
-      {/* Daytime Sky */}
+      {/* Daytime Sky - reduced atmospheric effects for better visibility */}
       <Sky 
         distance={450000}
         sunPosition={[100, 50, 100]}
         inclination={0.6}
         azimuth={0.25}
-        turbidity={2}
-        rayleigh={0.5}
+        turbidity={0.5}
+        rayleigh={0.1}
+        mieCoefficient={0.001}
+        mieDirectionalG={0.7}
       />
       
       {/* Moving Clouds */}
@@ -207,9 +209,6 @@ function Scene() {
         velocity={gameState.rocket.velocity}
         altitude={gameState.rocket.altitude}
       />
-      
-      {/* Daytime fog for depth */}
-      <fog attach="fog" args={['#87CEEB', 1000, 5000]} />
       
       {/* Ground and environment */}
       <Ground />

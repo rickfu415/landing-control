@@ -254,6 +254,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 mode = data.get("mode", "manual")
                 wind_level = data.get("wind_level")
                 rocket_preset = data.get("rocket_preset")
+                difficulty = data.get("difficulty", "medium")
                 
                 mode_map = {
                     "manual": GameMode.MANUAL,
@@ -261,6 +262,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     "assisted": GameMode.ASSISTED,
                 }
                 sessions[session_id].config.mode = mode_map.get(mode, GameMode.MANUAL)
+                sessions[session_id].config.difficulty = difficulty
                 
                 if wind_level is not None:
                     # Validate and set wind level
@@ -291,11 +293,12 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                             turbulence_strength=0.3,
                             seed=None
                         )
-                        # IMPORTANT: Pass flight_recorder to new physics engine!
+                        # IMPORTANT: Pass flight_recorder and difficulty to new physics engine!
                         sessions[session_id].physics = PhysicsEngine(
                             rocket_config=rocket_config, 
                             wind_config=wind_config,
-                            flight_recorder=sessions[session_id].flight_recorder
+                            flight_recorder=sessions[session_id].flight_recorder,
+                            difficulty=sessions[session_id].config.difficulty
                         )
                         # Reset physics to apply new rocket (velocity will be calculated from terminal velocity)
                         sessions[session_id].physics.reset(
@@ -308,7 +311,8 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     "type": "config_updated",
                     "mode": mode,
                     "wind_level": sessions[session_id].config.wind_level,
-                    "rocket_preset": sessions[session_id].config.rocket_preset
+                    "rocket_preset": sessions[session_id].config.rocket_preset,
+                    "difficulty": sessions[session_id].config.difficulty
                 })
     
     except WebSocketDisconnect:

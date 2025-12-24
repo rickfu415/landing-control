@@ -2,16 +2,16 @@ import { useMemo } from 'react'
 import * as THREE from 'three'
 
 function Land() {
-  // Create a textured land surface
+  // Pure green grass surface
   return (
     <mesh 
       receiveShadow 
       position={[0, -1, 0]} 
       rotation={[-Math.PI / 2, 0, 0]}
     >
-      <planeGeometry args={[10000, 10000]} />
+      <planeGeometry args={[50000, 50000]} />
       <meshStandardMaterial 
-        color="#8B7355"  // Brown/tan land color
+        color="#4A7C59"  // Grass green color
         metalness={0.0}
         roughness={0.95}
       />

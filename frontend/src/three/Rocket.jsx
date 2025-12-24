@@ -9,14 +9,19 @@ function EngineFlame({ throttle }) {
   
   useFrame((state) => {
     if (flameRef.current && throttle > 0) {
-      // Animate flame
-      const scale = 0.8 + Math.sin(state.clock.elapsedTime * 30) * 0.2
-      const length = throttle * 15 * scale
-      flameRef.current.scale.set(1, length, 1)
+      // Animate flame with pulsing effect
+      const pulse = 0.8 + Math.sin(state.clock.elapsedTime * 30) * 0.2
+      
+      // Scale both length and width with throttle
+      const length = throttle * 15 * pulse
+      const width = 0.5 + throttle * 1.0  // Width scales from 0.5 to 1.5
+      
+      flameRef.current.scale.set(width, length, width)
       flameRef.current.position.y = -length / 2 - 2
       
       if (innerFlameRef.current) {
-        innerFlameRef.current.scale.set(0.6, length * 0.8, 0.6)
+        const innerWidth = width * 0.6
+        innerFlameRef.current.scale.set(innerWidth, length * 0.8, innerWidth)
         innerFlameRef.current.position.y = -length * 0.4 - 2
       }
     }
@@ -29,21 +34,21 @@ function EngineFlame({ throttle }) {
       {/* Outer flame (orange) */}
       <mesh ref={flameRef}>
         <coneGeometry args={[1.5, 1, 16]} />
-        <meshBasicMaterial color="#ff6b35" transparent opacity={0.8} />
+        <meshBasicMaterial color="#ff6b35" transparent opacity={0.7 + throttle * 0.2} />
       </mesh>
       
       {/* Inner flame (bright yellow) */}
       <mesh ref={innerFlameRef}>
         <coneGeometry args={[0.8, 1, 16]} />
-        <meshBasicMaterial color="#ffff00" transparent opacity={0.9} />
+        <meshBasicMaterial color="#ffff00" transparent opacity={0.8 + throttle * 0.2} />
       </mesh>
       
-      {/* Point light for illumination */}
+      {/* Point light for illumination - scales with throttle */}
       <pointLight 
-        position={[0, -5, 0]} 
-        intensity={throttle * 50} 
+        position={[0, -5 * throttle, 0]} 
+        intensity={throttle * 80} 
         color="#ff6b35" 
-        distance={100}
+        distance={50 + throttle * 100}
       />
     </group>
   )

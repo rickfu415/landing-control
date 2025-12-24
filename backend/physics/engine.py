@@ -78,6 +78,29 @@ class RocketState:
     
     def to_dict(self, geometry: RocketGeometry = None, aerodynamics_model = None) -> dict:
         """Convert state to dictionary for JSON serialization."""
+        # Calculate bottom altitude (what matters for landing)
+        # This ensures HUD altitude matches the landing detection logic
+        if geometry:
+            # Down vector in body frame (opposite of up)
+            down_body = np.array([0.0, -1.0, 0.0])
+            
+            # Rotate to world frame using quaternion
+            # Using same logic as check_landing() for consistency
+            qw, qx, qy, qz = self.orientation
+            # Quaternion rotation formula
+            t = 2.0 * np.cross(np.array([qx, qy, qz]), down_body)
+            down_world = down_body + qw * t + np.cross(np.array([qx, qy, qz]), t)
+            
+            # Distance from COM to bottom of rocket
+            com_to_bottom = geometry.config.com_height
+            
+            # Calculate bottom position
+            bottom_position = self.position + down_world * com_to_bottom
+            altitude = bottom_position[1]
+        else:
+            # Fallback to COM altitude if no geometry provided
+            altitude = self.position[1]
+        
         result = {
             "position": self.position.tolist(),
             "velocity": self.velocity.tolist(),
@@ -92,7 +115,7 @@ class RocketState:
             "landed": self.landed,
             "crashed": self.crashed,
             "touchdown_velocity": self.touchdown_velocity,
-            "altitude": self.position[1],
+            "altitude": float(altitude),  # Bottom altitude (matches landing detection)
             "speed": float(np.linalg.norm(self.velocity)),
             "vertical_speed": self.velocity[1],
             "horizontal_speed": float(np.sqrt(self.velocity[0]**2 + self.velocity[2]**2)),

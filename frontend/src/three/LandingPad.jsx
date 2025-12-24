@@ -2,16 +2,16 @@ import { useRef } from 'react'
 import * as THREE from 'three'
 
 function LandingPad() {
-  // Landing pad dimensions (like the drone ship)
+  // Landing pad dimensions - concrete pad on land
   const padWidth = 50
   const padLength = 90
   
   return (
     <group position={[0, 0.1, 0]}>
-      {/* Main deck */}
+      {/* Concrete landing pad */}
       <mesh receiveShadow position={[0, 0, 0]}>
         <boxGeometry args={[padWidth, 0.5, padLength]} />
-        <meshStandardMaterial color="#2a2a2a" metalness={0.3} roughness={0.8} />
+        <meshStandardMaterial color="#808080" metalness={0.0} roughness={0.9} />
       </mesh>
       
       {/* Landing target - outer circle */}
@@ -36,18 +36,18 @@ function LandingPad() {
         <meshBasicMaterial color="#ffcc00" side={THREE.DoubleSide} />
       </mesh>
       
-      {/* Edge barriers */}
+      {/* Edge markings - painted lines instead of barriers */}
       {[
-        [padWidth/2, 1, 0],
-        [-padWidth/2, 1, 0],
+        [padWidth/2 - 1, 0.3, 0],
+        [-padWidth/2 + 1, 0.3, 0],
       ].map((pos, i) => (
         <mesh key={i} position={pos}>
-          <boxGeometry args={[1, 2, padLength]} />
+          <boxGeometry args={[2, 0.1, padLength]} />
           <meshStandardMaterial color="#ff3333" />
         </mesh>
       ))}
       
-      {/* Corner posts with lights */}
+      {/* Corner markers - low profile for daytime landing */}
       {[
         [padWidth/2 - 2, 0, padLength/2 - 2],
         [-padWidth/2 + 2, 0, padLength/2 - 2],
@@ -55,27 +55,17 @@ function LandingPad() {
         [-padWidth/2 + 2, 0, -padLength/2 + 2],
       ].map((pos, i) => (
         <group key={i} position={pos}>
-          <mesh position={[0, 3, 0]}>
-            <cylinderGeometry args={[0.3, 0.3, 6, 8]} />
-            <meshStandardMaterial color="#444444" />
-          </mesh>
-          <pointLight 
-            position={[0, 6, 0]} 
-            intensity={20} 
-            color="#00ff88" 
-            distance={50}
-          />
-          <mesh position={[0, 6.5, 0]}>
-            <sphereGeometry args={[0.5, 16, 16]} />
-            <meshBasicMaterial color="#00ff88" />
+          <mesh position={[0, 0.5, 0]}>
+            <cylinderGeometry args={[0.5, 0.5, 1, 8]} />
+            <meshStandardMaterial color="#ff6600" />
           </mesh>
         </group>
       ))}
       
-      {/* "Of Course I Still Love You" text area (simplified) */}
+      {/* Landing zone text area */}
       <mesh position={[0, 0.35, -35]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[30, 5]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.8} />
+        <meshBasicMaterial color="#000000" transparent opacity={0.6} />
       </mesh>
     </group>
   )

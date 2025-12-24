@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import * as THREE from 'three'
 
-function Ocean() {
+function Land() {
+  // Create a textured land surface
   return (
     <mesh 
       receiveShadow 
@@ -10,24 +11,28 @@ function Ocean() {
     >
       <planeGeometry args={[10000, 10000]} />
       <meshStandardMaterial 
-        color="#0a3d62"
-        metalness={0.2}
-        roughness={0.6}
-        transparent
-        opacity={0.9}
+        color="#8B7355"  // Brown/tan land color
+        metalness={0.0}
+        roughness={0.95}
       />
     </mesh>
   )
 }
 
 function Horizon() {
-  // Distant terrain/horizon
+  // Distant terrain/hills
   return (
     <group>
-      {/* Distant mountains/terrain silhouette */}
-      <mesh position={[0, 50, -2000]} rotation={[0, 0, 0]}>
+      {/* Distant hills - green/brown */}
+      <mesh position={[0, 30, -2000]} rotation={[0, 0, 0]}>
+        <planeGeometry args={[10000, 150]} />
+        <meshBasicMaterial color="#6B8E23" transparent opacity={0.6} />
+      </mesh>
+      
+      {/* More distant mountains - blue tint */}
+      <mesh position={[0, 80, -3500]} rotation={[0, 0, 0]}>
         <planeGeometry args={[10000, 200]} />
-        <meshBasicMaterial color="#1a1a2e" transparent opacity={0.5} />
+        <meshBasicMaterial color="#4A6FA5" transparent opacity={0.4} />
       </mesh>
     </group>
   )
@@ -36,14 +41,8 @@ function Horizon() {
 function Ground() {
   return (
     <group>
-      <Ocean />
+      <Land />
       <Horizon />
-      
-      {/* Subtle grid on ocean for depth perception */}
-      <gridHelper 
-        args={[2000, 100, '#0a4d72', '#0a3d62']} 
-        position={[0, 0, 0]}
-      />
     </group>
   )
 }

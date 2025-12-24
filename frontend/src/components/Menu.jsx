@@ -2,6 +2,7 @@ import useGameStore from '../stores/gameStore'
 import useLanguageStore from '../stores/languageStore'
 import { useTranslation } from '../i18n/translations'
 import { getRocketSpecs, formatMass } from '../data/rocketSpecs'
+import ThrustProfilePlanner from './ThrustProfilePlanner'
 
 function Menu() {
   const { connected, rocketPreset, setRocketPreset, startGame } = useGameStore()
@@ -226,6 +227,9 @@ function Menu() {
                 </li>
               </ul>
             </div>
+            
+            {/* Thrust Profile Planner */}
+            <ThrustProfilePlanner inMenu={true} />
             
             {/* Footer */}
             <div className="text-center text-sm text-gray-500 italic">

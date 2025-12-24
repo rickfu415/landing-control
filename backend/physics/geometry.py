@@ -273,7 +273,7 @@ def calculate_terminal_velocity(total_mass: float, diameter: float, altitude: fl
     return v_term
 
 
-def calculate_landing_fuel(dry_mass: float, thrust_kn: float, isp: float, diameter: float, safety_margin: float = 1.10) -> float:
+def calculate_landing_fuel(dry_mass: float, thrust_kn: float, isp: float, diameter: float, safety_margin: float = 1.15) -> float:
     """
     Calculate optimal landing fuel based on rocket parameters and terminal velocity.
     
@@ -281,7 +281,7 @@ def calculate_landing_fuel(dry_mass: float, thrust_kn: float, isp: float, diamet
     - Terminal velocity at starting altitude (5000m)
     - Gravity losses during burn
     - Changing mass during burn
-    - Configurable safety margin (default 10% extra)
+    - Configurable safety margin (default 15% extra - increased from 10%)
     
     Args:
         dry_mass: Rocket dry mass in kg

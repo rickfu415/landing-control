@@ -142,6 +142,7 @@ export const translations = {
       fuelEfficiency: 'Fuel Efficiency',
       viewFlightReview: 'View Flight Review',
       tryAgain: 'Try Again',
+      autoRedirect: 'Opening flight review in',
       tipSuccess: 'Pro tip: Start your landing burn earlier for softer touchdowns',
       tipFailed: 'Tip: Watch your vertical speed and start braking earlier'
     },
@@ -149,6 +150,40 @@ export const translations = {
     // Connection
     connection: {
       connecting: '⚠ Connecting to server...'
+    },
+    
+    // Flight Review
+    flightReview: {
+      title: 'Flight Review',
+      subtitle: 'Detailed analysis of your landing attempt',
+      tabs: {
+        summary: 'Summary',
+        charts: 'Charts',
+        timeline: 'Timeline',
+        telemetry: 'Telemetry'
+      },
+      noData: 'No data recorded',
+      noDataDesc: 'The flight recorder may not have started or no frames were captured.'
+    },
+    
+    // Common
+    common: {
+      close: 'Close'
+    },
+    
+    // Thrust Profile Planner
+    thrustProfile: {
+      title: 'Thrust Profile',
+      active: 'Active',
+      on: 'ON',
+      off: 'OFF',
+      currentTime: 'Current Time',
+      addWaypoint: 'Add Waypoint',
+      presets: 'Presets',
+      gentle: 'Gentle',
+      aggressive: 'Aggressive',
+      hover: 'Hover',
+      timeline: 'Timeline'
     }
   },
   
@@ -295,6 +330,7 @@ export const translations = {
       fuelEfficiency: '燃料效率',
       viewFlightReview: '查看飞行回顾',
       tryAgain: '再试一次',
+      autoRedirect: '飞行回顾将在以下时间打开',
       tipSuccess: '专业提示：提前开始着陆燃烧以获得更柔和的触地',
       tipFailed: '提示：注意垂直速度并提前开始制动'
     },
@@ -302,6 +338,40 @@ export const translations = {
     // 连接
     connection: {
       connecting: '⚠ 正在连接服务器...'
+    },
+    
+    // 飞行回顾
+    flightReview: {
+      title: '飞行回顾',
+      subtitle: '着陆尝试的详细分析',
+      tabs: {
+        summary: '总结',
+        charts: '图表',
+        timeline: '时间线',
+        telemetry: '遥测数据'
+      },
+      noData: '无数据记录',
+      noDataDesc: '飞行记录器可能未启动或未捕获任何帧。'
+    },
+    
+    // 通用
+    common: {
+      close: '关闭'
+    },
+    
+    // 推力曲线规划器
+    thrustProfile: {
+      title: '推力曲线',
+      active: '激活',
+      on: '开',
+      off: '关',
+      currentTime: '当前时间',
+      addWaypoint: '添加航点',
+      presets: '预设',
+      gentle: '温和',
+      aggressive: '激进',
+      hover: '悬停',
+      timeline: '时间线'
     }
   }
 }

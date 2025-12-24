@@ -53,6 +53,14 @@ const useGameStore = create((set, get) => ({
   throttle: 0,
   gimbal: [0, 0],
   
+  // Thrust profile planner
+  thrustProfile: [
+    { time: 0, throttle: 0 },
+    { time: 10, throttle: 50 },
+    { time: 20, throttle: 100 },
+  ],
+  thrustProfileActive: false,
+  
   // UI state
   showMenu: true,
   gameMode: 'manual',
@@ -98,6 +106,9 @@ const useGameStore = create((set, get) => ({
   setShowMenu: (showMenu) => set({ showMenu }),
   setGameMode: (gameMode) => set({ gameMode }),
   setRocketPreset: (rocketPreset) => set({ rocketPreset }),
+  
+  setThrustProfile: (thrustProfile) => set({ thrustProfile }),
+  setThrustProfileActive: (thrustProfileActive) => set({ thrustProfileActive }),
   
   // Game control actions
   startGame: () => {

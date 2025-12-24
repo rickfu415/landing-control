@@ -1,214 +1,104 @@
 import { useRef, useMemo, useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Stars, Sky, OrbitControls } from '@react-three/drei'
+import { Sky, OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import useGameStore from '../stores/gameStore'
 import Rocket from './Rocket'
 import LandingPad from './LandingPad'
 import Ground from './Ground'
 
-// Flying stars that move with velocity
-function FlyingStars({ velocity, altitude }) {
-  const pointsRef = useRef()
-  const starCount = 500
+// Moving clouds to show falling motion
+function MovingClouds({ velocity, altitude }) {
+  const cloudsRef = useRef()
+  const cloudCount = 30
   
-  const [positions, speeds] = useMemo(() => {
-    const pos = new Float32Array(starCount * 3)
-    const spd = new Float32Array(starCount)
-    
-    for (let i = 0; i < starCount; i++) {
-      const theta = Math.random() * Math.PI * 2
-      const phi = Math.acos(2 * Math.random() - 1)
-      const radius = 100 + Math.random() * 400
-      
-      pos[i * 3] = radius * Math.sin(phi) * Math.cos(theta)
-      pos[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta)
-      pos[i * 3 + 2] = radius * Math.cos(phi)
-      
-      spd[i] = 0.5 + Math.random() * 1.5
+  const cloudData = useMemo(() => {
+    const clouds = []
+    for (let i = 0; i < cloudCount; i++) {
+      clouds.push({
+        x: (Math.random() - 0.5) * 2000,
+        y: 500 + Math.random() * 3000,  // Clouds between 500m and 3500m
+        z: (Math.random() - 0.5) * 2000,
+        size: 30 + Math.random() * 50,
+        opacity: 0.3 + Math.random() * 0.4,
+        driftSpeed: 0.5 + Math.random() * 1.5
+      })
     }
-    
-    return [pos, spd]
+    return clouds
   }, [])
   
   useFrame((state, delta) => {
-    if (!pointsRef.current) return
+    if (!cloudsRef.current) return
     
-    const posArray = pointsRef.current.geometry.attributes.position.array
-    const speed = Math.sqrt(velocity[0]**2 + velocity[1]**2 + velocity[2]**2)
-    
-    if (speed > 10) {
-      for (let i = 0; i < starCount; i++) {
-        posArray[i * 3] += velocity[0] * delta * speeds[i] * 0.3
-        posArray[i * 3 + 1] += velocity[1] * delta * speeds[i] * 0.3
-        posArray[i * 3 + 2] += velocity[2] * delta * speeds[i] * 0.3
-        
-        const x = posArray[i * 3]
-        const y = posArray[i * 3 + 1]
-        const z = posArray[i * 3 + 2]
-        const dist = Math.sqrt(x*x + y*y + z*z)
-        
-        if (dist < 50 || dist > 600) {
-          const theta = Math.random() * Math.PI * 2
-          const phi = Math.acos(2 * Math.random() - 1)
-          const radius = 300 + Math.random() * 200
-          
-          const vMag = Math.sqrt(velocity[0]**2 + velocity[1]**2 + velocity[2]**2) + 0.001
-          posArray[i * 3] = (velocity[0] / vMag) * radius + (Math.random() - 0.5) * 200
-          posArray[i * 3 + 1] = (velocity[1] / vMag) * radius + (Math.random() - 0.5) * 200
-          posArray[i * 3 + 2] = (velocity[2] / vMag) * radius + (Math.random() - 0.5) * 200
-        }
+    cloudsRef.current.children.forEach((cloud, i) => {
+      const data = cloudData[i]
+      
+      // Move clouds relative to rocket velocity (parallax effect)
+      cloud.position.y += velocity[1] * delta * 0.15
+      cloud.position.x += velocity[0] * delta * 0.15
+      cloud.position.z += velocity[2] * delta * 0.15
+      
+      // Add natural drift
+      cloud.position.x += data.driftSpeed * delta
+      
+      // Reset clouds that go too far
+      if (cloud.position.y > altitude + 4000) {
+        cloud.position.y = altitude - 500
+        cloud.position.x = (Math.random() - 0.5) * 2000
+        cloud.position.z = (Math.random() - 0.5) * 2000
+      }
+      if (cloud.position.y < altitude - 1000) {
+        cloud.position.y = altitude + 3500
+        cloud.position.x = (Math.random() - 0.5) * 2000
+        cloud.position.z = (Math.random() - 0.5) * 2000
       }
       
-      pointsRef.current.geometry.attributes.position.needsUpdate = true
-    }
-  })
-  
-  const speed = Math.sqrt(velocity[0]**2 + velocity[1]**2 + velocity[2]**2)
-  const starSize = Math.min(2 + speed * 0.01, 4)
-  
-  return (
-    <points ref={pointsRef}>
-      <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          count={starCount}
-          array={positions}
-          itemSize={3}
-        />
-      </bufferGeometry>
-      <pointsMaterial
-        color="#ffffff"
-        size={starSize}
-        transparent
-        opacity={0.8}
-        sizeAttenuation
-      />
-    </points>
-  )
-}
-
-// Distant background stars (static in world space)
-function BackgroundStars() {
-  const starsRef = useRef()
-  
-  const positions = useMemo(() => {
-    const pos = new Float32Array(2000 * 3)
-    
-    for (let i = 0; i < 2000; i++) {
-      const theta = Math.random() * Math.PI * 2
-      const phi = Math.acos(2 * Math.random() - 1)
-      const radius = 2000 + Math.random() * 3000
-      
-      pos[i * 3] = radius * Math.sin(phi) * Math.cos(theta)
-      pos[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta)
-      pos[i * 3 + 2] = radius * Math.cos(phi)
-    }
-    
-    return pos
-  }, [])
-  
-  useFrame((state) => {
-    if (starsRef.current) {
-      starsRef.current.material.opacity = 0.6 + Math.sin(state.clock.elapsedTime * 0.5) * 0.1
-    }
+      // Animate cloud opacity
+      const baseMaterial = cloud.children[0]?.material
+      if (baseMaterial) {
+        baseMaterial.opacity = data.opacity + Math.sin(state.clock.elapsedTime * 0.5 + i) * 0.1
+      }
+    })
   })
   
   return (
-    <points ref={starsRef}>
-      <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          count={2000}
-          array={positions}
-          itemSize={3}
-        />
-      </bufferGeometry>
-      <pointsMaterial
-        color="#ffffff"
-        size={2}
-        transparent
-        opacity={0.7}
-        sizeAttenuation={false}
-      />
-    </points>
-  )
-}
-
-// Colored nebula-like stars
-function ColoredStars() {
-  const positions = useMemo(() => {
-    const pos = new Float32Array(500 * 3)
-    
-    for (let i = 0; i < 500; i++) {
-      const theta = Math.random() * Math.PI * 2
-      const phi = Math.acos(2 * Math.random() - 1)
-      const radius = 1500 + Math.random() * 2000
-      
-      pos[i * 3] = radius * Math.sin(phi) * Math.cos(theta)
-      pos[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta)
-      pos[i * 3 + 2] = radius * Math.cos(phi)
-    }
-    
-    return pos
-  }, [])
-  
-  return (
-    <>
-      <points>
-        <bufferGeometry>
-          <bufferAttribute
-            attach="attributes-position"
-            count={200}
-            array={positions.slice(0, 600)}
-            itemSize={3}
-          />
-        </bufferGeometry>
-        <pointsMaterial
-          color="#88ccff"
-          size={3}
-          transparent
-          opacity={0.5}
-          sizeAttenuation={false}
-        />
-      </points>
-      
-      <points>
-        <bufferGeometry>
-          <bufferAttribute
-            attach="attributes-position"
-            count={150}
-            array={positions.slice(600, 1050)}
-            itemSize={3}
-          />
-        </bufferGeometry>
-        <pointsMaterial
-          color="#ffaa66"
-          size={2.5}
-          transparent
-          opacity={0.4}
-          sizeAttenuation={false}
-        />
-      </points>
-      
-      <points>
-        <bufferGeometry>
-          <bufferAttribute
-            attach="attributes-position"
-            count={150}
-            array={positions.slice(1050, 1500)}
-            itemSize={3}
-          />
-        </bufferGeometry>
-        <pointsMaterial
-          color="#cc88ff"
-          size={2}
-          transparent
-          opacity={0.3}
-          sizeAttenuation={false}
-        />
-      </points>
-    </>
+    <group ref={cloudsRef}>
+      {cloudData.map((cloud, i) => (
+        <group key={i} position={[cloud.x, cloud.y, cloud.z]}>
+          {/* Main cloud body - multiple spheres for fluffy look */}
+          <mesh position={[0, 0, 0]}>
+            <sphereGeometry args={[cloud.size, 8, 8]} />
+            <meshStandardMaterial 
+              color="#ffffff" 
+              transparent 
+              opacity={cloud.opacity}
+              roughness={1}
+              metalness={0}
+            />
+          </mesh>
+          <mesh position={[cloud.size * 0.5, cloud.size * 0.2, 0]}>
+            <sphereGeometry args={[cloud.size * 0.7, 8, 8]} />
+            <meshStandardMaterial 
+              color="#ffffff" 
+              transparent 
+              opacity={cloud.opacity * 0.8}
+              roughness={1}
+              metalness={0}
+            />
+          </mesh>
+          <mesh position={[-cloud.size * 0.4, -cloud.size * 0.1, 0]}>
+            <sphereGeometry args={[cloud.size * 0.6, 8, 8]} />
+            <meshStandardMaterial 
+              color="#ffffff" 
+              transparent 
+              opacity={cloud.opacity * 0.9}
+              roughness={1}
+              metalness={0}
+            />
+          </mesh>
+        </group>
+      ))}
+    </group>
   )
 }
 
@@ -285,48 +175,41 @@ function Scene() {
       {/* Camera controller - follows rocket center, user can only change angle */}
       <CameraController />
       
-      {/* Lighting */}
-      <ambientLight intensity={0.25} />
+      {/* Daytime Lighting */}
+      <ambientLight intensity={0.6} />
       <directionalLight 
         position={[100, 200, 100]} 
-        intensity={1.5}
+        intensity={2.0}
+        color="#ffffff"
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
       />
-      <pointLight position={[0, 0, 0]} intensity={0.5} color="#ff6b35" />
+      {/* Sun light */}
+      <directionalLight 
+        position={[-50, 150, -50]} 
+        intensity={1.0}
+        color="#FFF8DC"
+      />
       
-      {/* Multiple star layers */}
-      <BackgroundStars />
-      <ColoredStars />
-      <FlyingStars 
-        velocity={gameState.rocket.velocity} 
+      {/* Daytime Sky */}
+      <Sky 
+        distance={450000}
+        sunPosition={[100, 50, 100]}
+        inclination={0.6}
+        azimuth={0.25}
+        turbidity={2}
+        rayleigh={0.5}
+      />
+      
+      {/* Moving Clouds */}
+      <MovingClouds 
+        velocity={gameState.rocket.velocity}
         altitude={gameState.rocket.altitude}
       />
       
-      {/* Default drei Stars */}
-      <Stars 
-        radius={400} 
-        depth={200} 
-        count={3000} 
-        factor={6} 
-        saturation={0.2} 
-        fade 
-        speed={0.5}
-      />
-      
-      {/* Sky gradient for atmosphere (only at lower altitudes) */}
-      {gameState.rocket.altitude < 3000 && (
-        <Sky 
-          distance={450000}
-          sunPosition={[100, 20, 100]}
-          inclination={0.5}
-          azimuth={0.25}
-        />
-      )}
-      
-      {/* Fog for atmosphere */}
-      <fog attach="fog" args={['#0a0a1a', 500, 4000]} />
+      {/* Daytime fog for depth */}
+      <fog attach="fog" args={['#87CEEB', 1000, 5000]} />
       
       {/* Ground and environment */}
       <Ground />

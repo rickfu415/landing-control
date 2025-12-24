@@ -121,7 +121,7 @@ function GameOver() {
       </div>
       
       {/* Flight Review Modal */}
-      {showReview && <FlightReview onClose={() => setShowReview(false)} />}
+      {showReview && <FlightReview onClose={() => setShowReview(false)} onTryAgain={resetGame} />}
     </div>
   )
 }

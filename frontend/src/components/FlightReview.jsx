@@ -3,11 +3,11 @@ import useGameStore from '../stores/gameStore'
 import useLanguageStore from '../stores/languageStore'
 import { useTranslation } from '../i18n/translations'
 
-function FlightReview({ onClose }) {
+function FlightReview({ onClose, onTryAgain }) {
   const { gameState } = useGameStore()
   const { language } = useLanguageStore()
   const t = useTranslation(language)
-  const [activeTab, setActiveTab] = useState('summary')
+  const [activeTab, setActiveTab] = useState('charts')  // Start with charts tab
   
   const flightData = gameState.flight_review
   
@@ -16,6 +16,13 @@ function FlightReview({ onClose }) {
   }
   
   const { statistics, events, data_points } = flightData
+  
+  // Handle try again - close modal and reset game
+  const handleTryAgain = () => {
+    if (onTryAgain) {
+      onTryAgain()
+    }
+  }
   
   // Helper to format time
   const formatTime = (seconds) => {
@@ -37,10 +44,10 @@ function FlightReview({ onClose }) {
         <div className="p-6 border-b border-gray-700 flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-display font-black text-white mb-1">
-              📊 Flight Review
+              📊 {t.flightReview?.title || 'Flight Review'}
             </h1>
             <p className="text-sm text-gray-400">
-              Detailed analysis of your landing attempt
+              {t.flightReview?.subtitle || 'Detailed analysis of your landing attempt'}
             </p>
           </div>
           <button
@@ -63,10 +70,10 @@ function FlightReview({ onClose }) {
                   : 'text-gray-400 hover:text-white'
               }`}
             >
-              {tab === 'summary' && '📈 Summary'}
-              {tab === 'charts' && '📊 Charts'}
-              {tab === 'timeline' && '⏱️ Timeline'}
-              {tab === 'telemetry' && '📡 Telemetry'}
+              {tab === 'summary' && `📈 ${t.flightReview?.tabs?.summary || 'Summary'}`}
+              {tab === 'charts' && `📊 ${t.flightReview?.tabs?.charts || 'Charts'}`}
+              {tab === 'timeline' && `⏱️ ${t.flightReview?.tabs?.timeline || 'Timeline'}`}
+              {tab === 'telemetry' && `📡 ${t.flightReview?.tabs?.telemetry || 'Telemetry'}`}
             </button>
           ))}
         </div>
@@ -86,6 +93,22 @@ function FlightReview({ onClose }) {
             <TelemetryTab dataPoints={data_points} formatNumber={formatNumber} />
           )}
         </div>
+        
+        {/* Footer with Try Again button */}
+        <div className="p-6 border-t border-gray-700 flex justify-center gap-4">
+          <button
+            onClick={handleTryAgain}
+            className="px-8 py-4 rounded-lg btn-primary font-display font-bold text-lg uppercase tracking-wider"
+          >
+            🚀 {t.gameOver?.tryAgain || 'Try Again'}
+          </button>
+          <button
+            onClick={onClose}
+            className="px-8 py-4 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-600 text-gray-300 hover:text-white transition-colors font-display font-bold text-lg uppercase tracking-wider"
+          >
+            ✕ {t.common?.close || 'Close'}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -93,11 +116,14 @@ function FlightReview({ onClose }) {
 
 // Charts Tab Component
 function ChartsTab({ dataPoints, formatNumber }) {
+  const { language } = useLanguageStore()
+  const t = useTranslation(language)
+  
   if (!dataPoints || dataPoints.length === 0) {
     return (
       <div className="text-center text-gray-400 py-12">
-        <p className="text-xl mb-2">No data recorded</p>
-        <p className="text-sm">The flight recorder may not have started or no frames were captured.</p>
+        <p className="text-xl mb-2">{t.flightReview?.noData || 'No data recorded'}</p>
+        <p className="text-sm">{t.flightReview?.noDataDesc || 'The flight recorder may not have started or no frames were captured.'}</p>
         <div className="mt-4 text-xs text-left max-w-md mx-auto hud-panel p-4 rounded">
           <p className="text-white font-bold mb-2">Debug Info:</p>
           <p>Data points: {dataPoints ? dataPoints.length : 'null'}</p>

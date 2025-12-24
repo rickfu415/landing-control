@@ -6,6 +6,7 @@ import { useTranslation } from './i18n/translations'
 import Scene from './three/Scene'
 import HUD from './components/HUD'
 import Controls from './components/Controls'
+import ThrustProfilePlanner from './components/ThrustProfilePlanner'
 import Menu from './components/Menu'
 import GameOver from './components/GameOver'
 import LanguageSelector from './components/LanguageSelector'
@@ -39,6 +40,9 @@ function App() {
       
       {/* Control Panel */}
       <Controls />
+      
+      {/* Thrust Profile Planner */}
+      <ThrustProfilePlanner />
       
       {/* Connection Status */}
       {!connected && (

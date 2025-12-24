@@ -273,27 +273,6 @@ function Controls() {
         </div>
       </div>
       
-      {/* Center - Action buttons */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-auto">
-        <div className="hud-panel p-3 rounded-lg flex gap-2">
-          <button
-            onClick={() => paused ? resumeGame() : pauseGame()}
-            className={`px-4 py-2 rounded font-display font-bold text-sm uppercase tracking-wider transition-all
-                      ${paused 
-                        ? 'bg-green-600 hover:bg-green-500 text-white' 
-                        : 'bg-yellow-600 hover:bg-yellow-500 text-black'}`}
-          >
-            {paused ? t.controls.resume : t.controls.pause}
-          </button>
-          <button
-            onClick={resetGame}
-            className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600 text-white 
-                     font-display font-bold text-sm uppercase tracking-wider transition-colors"
-          >
-            {t.controls.reset}
-          </button>
-        </div>
-      </div>
     </>
   )
 }

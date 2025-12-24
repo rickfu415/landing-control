@@ -102,7 +102,7 @@ function HUD() {
   
   return (
     <div className="absolute inset-0 pointer-events-none">
-      {/* Mission Time - Top Center */}
+      {/* Mission Time & Time to Impact - Top Center */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2">
         <div className="bg-black/30 backdrop-blur-sm px-6 py-2 rounded-lg border border-gray-700/50">
           <div className="text-center">
@@ -110,6 +110,14 @@ function HUD() {
             <div className="text-3xl font-display font-black text-white font-mono">
               {time.toFixed(1)}<span className="text-sm text-gray-400">s</span>
             </div>
+            {timeToImpact < 1000 && timeToImpact > 0 && (
+              <div className="mt-1 pt-1 border-t border-gray-600/50">
+                <span className="text-[10px] text-gray-400 uppercase tracking-wider">{t.hud.timeToImpact}</span>
+                <div className={`text-lg font-mono font-bold ${timeToImpact < 10 ? 'text-red-400 animate-pulse' : 'text-yellow-400'}`}>
+                  {timeToImpact.toFixed(1)}<span className="text-xs text-gray-400">s</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -144,24 +152,11 @@ function HUD() {
             max={50}
           />
           
-          <Gauge 
-            label={t.hud.totalSpeed} 
-            value={speed} 
-            unit="m/s" 
-            max={200}
-          />
-          
           <div className="mt-2 pt-2 border-t border-gray-700">
             <StatRow label={t.hud.acceleration} value={totalAccel.toFixed(1)} unit="m/s²" />
             <StatRow label={t.hud.gForce} value={gForce.toFixed(2)} unit="G" warning={gForce > 3} />
             <StatRow label={t.hud.twr} value={twr.toFixed(2)} unit="" warning={twr > 0 && twr < 1} />
             <StatRow label={t.hud.distToPad} value={distanceFromPad.toFixed(1)} unit="m" warning={distanceFromPad > 30} />
-            <StatRow 
-              label={t.hud.timeToImpact} 
-              value={timeToImpact < 1000 ? timeToImpact.toFixed(1) : '---'} 
-              unit="s" 
-              warning={timeToImpact < 10 && timeToImpact > 0}
-            />
           </div>
         </div>
       </div>

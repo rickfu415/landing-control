@@ -26,7 +26,7 @@ function App() {
     <div className="w-full h-full relative">
       {/* 3D Scene */}
       <Canvas
-        camera={{ position: [0, 100, 200], fov: 60, far: 20000 }}
+        camera={{ position: [60, 160, 0], fov: 60, far: 20000 }}
         gl={{ antialias: true }}
       >
         <Scene />

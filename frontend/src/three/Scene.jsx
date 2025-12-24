@@ -109,6 +109,7 @@ function CameraController() {
   const controlsRef = useRef()
   const prevRocketPos = useRef(new THREE.Vector3(0, 5000, 0))
   const initialized = useRef(false)
+  const animationStartTime = useRef(null)
   
   // Rocket center is at half height from bottom (position is at engine)
   const rocketHeight = gameState.rocket.geometry?.height || 47.7
@@ -117,9 +118,12 @@ function CameraController() {
   // Initialize camera position on mount
   useEffect(() => {
     if (!initialized.current) {
-      // Set initial camera position - close to rocket
-      camera.position.set(0, 5000 + ROCKET_CENTER_OFFSET + 30, 80)
-      camera.lookAt(0, 5000 + ROCKET_CENTER_OFFSET, 0)
+      // Set initial camera position - far and below rocket, looking upward at the sky
+      const horizontalDist = 120  // Start farther away (will zoom to 60)
+      const verticalOffset = -20  // Start below rocket to look upward
+      camera.position.set(horizontalDist, 5000 + ROCKET_CENTER_OFFSET + verticalOffset, 0)
+      // Look up at the sky initially (above the rocket)
+      camera.lookAt(0, 5000 + ROCKET_CENTER_OFFSET + 150, 0)
       initialized.current = true
     }
   }, [camera])
@@ -134,14 +138,58 @@ function CameraController() {
       gameState.rocket.position[2]
     )
     
-    // Calculate how much the rocket moved
-    const rocketDelta = rocketCenter.clone().sub(prevRocketPos.current)
-    
-    // Move camera with rocket to maintain relative position
-    camera.position.add(rocketDelta)
-    
-    // Always target the rocket center
-    controlsRef.current.target.copy(rocketCenter)
+    // Camera animation during first 5 seconds
+    const missionTime = gameState.time
+    if (missionTime < 5 && gameState.running) {
+      if (animationStartTime.current === null) {
+        animationStartTime.current = missionTime
+      }
+      
+      // Progress from 0 to 1 over 5 seconds
+      const progress = Math.min(missionTime / 5, 1)
+      // Ease-in-out function for smooth animation
+      const eased = progress < 0.5 
+        ? 2 * progress * progress 
+        : 1 - Math.pow(-2 * progress + 2, 2) / 2
+      
+      // Interpolate camera position (zoom in 100% closer and move from below to high above)
+      const startHorizontal = 120
+      const endHorizontal = 48    // 20% closer (60 * 0.8 = 48)
+      const startVertical = -20   // Start below rocket
+      const endVertical = 121     // 10% steeper (110 * 1.1 = 121)
+      
+      const currentHorizontal = startHorizontal - (startHorizontal - endHorizontal) * eased
+      const currentVertical = startVertical + (endVertical - startVertical) * eased
+      
+      // Set camera position relative to rocket
+      const targetCameraPos = new THREE.Vector3(
+        rocketCenter.x + currentHorizontal,
+        rocketCenter.y + currentVertical,
+        rocketCenter.z
+      )
+      
+      camera.position.copy(targetCameraPos)
+      
+      // Interpolate look-at target (from sky above rocket to ground far below)
+      const startLookY = rocketCenter.y + 150  // Looking up at sky (above rocket)
+      const endLookY = rocketCenter.y - 200    // Looking down at ground (far below rocket) - very steep angle
+      const currentLookY = startLookY - (startLookY - endLookY) * eased
+      
+      const lookAtTarget = new THREE.Vector3(rocketCenter.x, currentLookY, rocketCenter.z)
+      camera.lookAt(lookAtTarget)
+      controlsRef.current.target.copy(rocketCenter)
+      
+    } else {
+      // After animation, normal camera follow behavior
+      // Calculate how much the rocket moved
+      const rocketDelta = rocketCenter.clone().sub(prevRocketPos.current)
+      
+      // Move camera with rocket to maintain relative position
+      camera.position.add(rocketDelta)
+      
+      // Always target the rocket center
+      controlsRef.current.target.copy(rocketCenter)
+    }
     
     // Update previous position
     prevRocketPos.current.copy(rocketCenter)
@@ -155,8 +203,8 @@ function CameraController() {
       enablePan={false}          // No panning - rocket stays centered
       enableZoom={true}
       enableRotate={true}
-      minDistance={40}           // Can't get too close (rocket is ~48m tall)
-      maxDistance={300}          // Can't get too far
+      minDistance={50}           // Can't get too close (rocket is ~48m tall)
+      maxDistance={250}          // Can't get too far
       maxPolarAngle={Math.PI * 0.85}
       minPolarAngle={Math.PI * 0.1}
       enableDamping={true}
@@ -192,15 +240,15 @@ function Scene() {
         color="#FFF8DC"
       />
       
-      {/* Daytime Sky - reduced atmospheric effects for better visibility */}
+      {/* Daytime Sky - deep blue gradient */}
       <Sky 
         distance={450000}
-        sunPosition={[100, 50, 100]}
-        inclination={0.6}
+        sunPosition={[100, 80, 100]}
+        inclination={0.5}
         azimuth={0.25}
-        turbidity={0.5}
-        rayleigh={0.1}
-        mieCoefficient={0.001}
+        turbidity={10}
+        rayleigh={3}
+        mieCoefficient={0.005}
         mieDirectionalG={0.7}
       />
       

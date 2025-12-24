@@ -75,6 +75,8 @@ class RocketState:
     
     # Touchdown velocity (saved at moment of landing/crash)
     touchdown_velocity: float = 0.0  # m/s (total speed at touchdown)
+    touchdown_vertical_speed: float = 0.0  # m/s (vertical speed at touchdown)
+    touchdown_horizontal_speed: float = 0.0  # m/s (horizontal speed at touchdown)
     
     def to_dict(self, geometry: RocketGeometry = None, aerodynamics_model = None) -> dict:
         """Convert state to dictionary for JSON serialization."""
@@ -115,6 +117,8 @@ class RocketState:
             "landed": self.landed,
             "crashed": self.crashed,
             "touchdown_velocity": self.touchdown_velocity,
+            "touchdown_vertical_speed": self.touchdown_vertical_speed,
+            "touchdown_horizontal_speed": self.touchdown_horizontal_speed,
             "altitude": float(altitude),  # Bottom altitude (matches landing detection)
             "speed": float(np.linalg.norm(self.velocity)),
             "vertical_speed": self.velocity[1],
@@ -428,8 +432,10 @@ class PhysicsEngine:
             total_speed = np.linalg.norm(self.state.velocity)  # Total velocity magnitude
             horizontal_distance = np.sqrt(self.state.position[0]**2 + self.state.position[2]**2)
             
-            # Save touchdown velocity for stats
+            # Save touchdown velocities for stats
             self.state.touchdown_velocity = total_speed
+            self.state.touchdown_vertical_speed = vertical_speed
+            self.state.touchdown_horizontal_speed = horizontal_speed
             
             # Calculate tilt angle from vertical
             # Up vector in body frame is [0, 1, 0]

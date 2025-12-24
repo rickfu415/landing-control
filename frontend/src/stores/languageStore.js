@@ -4,7 +4,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 const useLanguageStore = create(
   persist(
     (set) => ({
-      language: 'en', // 'en' or 'zh'
+      language: 'zh', // 'en' or 'zh' - default to Chinese
       setLanguage: (language) => set({ language }),
     }),
     {

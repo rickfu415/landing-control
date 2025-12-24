@@ -96,7 +96,8 @@ export const rocketSpecs = {
     thrust: 845,
     isp: 282,
     throttle: '40-100%',
-    gimbal: '±5°'
+    gimbal: '±5°',
+    initialVelocity: { vertical: -50, horizontal: 0 }
   },
   starship_super_heavy: {
     height: 69.0,
@@ -107,7 +108,8 @@ export const rocketSpecs = {
     thrust: 6900,  // 3 engines for landing (like Falcon 9 uses 1 of 9)
     isp: 330,
     throttle: '40-100%',
-    gimbal: '±15°'
+    gimbal: '±15°',
+    initialVelocity: { vertical: -60, horizontal: 0 }
   },
   long_march5_core: {
     height: 33.0,
@@ -118,7 +120,8 @@ export const rocketSpecs = {
     thrust: 700,
     isp: 310,
     throttle: '40-100%',
-    gimbal: '±5°'
+    gimbal: '±5°',
+    initialVelocity: { vertical: -45, horizontal: 0 }
   },
   long_march9_first_stage: {
     height: 50.0,
@@ -129,7 +132,8 @@ export const rocketSpecs = {
     thrust: 4800,
     isp: 335,
     throttle: '40-100%',
-    gimbal: '±8°'
+    gimbal: '±8°',
+    initialVelocity: { vertical: -55, horizontal: 0 }
   },
   soyuz_first_stage: {
     height: 27.8,
@@ -140,7 +144,8 @@ export const rocketSpecs = {
     thrust: 838,
     isp: 263,
     throttle: '40-100%',
-    gimbal: '±7°'
+    gimbal: '±7°',
+    initialVelocity: { vertical: -40, horizontal: 0 }
   },
   soyuz_booster: {
     height: 19.6,
@@ -151,7 +156,8 @@ export const rocketSpecs = {
     thrust: 838,
     isp: 263,
     throttle: '40-100%',
-    gimbal: '±7°'
+    gimbal: '±7°',
+    initialVelocity: { vertical: -35, horizontal: 0 }
   },
   proton_m_first_stage: {
     height: 21.2,
@@ -162,7 +168,8 @@ export const rocketSpecs = {
     thrust: 1014,
     isp: 285,
     throttle: '40-100%',
-    gimbal: '±7°'
+    gimbal: '±7°',
+    initialVelocity: { vertical: -48, horizontal: 0 }
   },
   angara_a5_first_stage: {
     height: 25.0,
@@ -173,7 +180,8 @@ export const rocketSpecs = {
     thrust: 2080,
     isp: 311,
     throttle: '40-100%',
-    gimbal: '±8°'
+    gimbal: '±8°',
+    initialVelocity: { vertical: -42, horizontal: 0 }
   },
   zhuque2_first_stage: {
     height: 30.0,
@@ -184,7 +192,8 @@ export const rocketSpecs = {
     thrust: 670,
     isp: 290,
     throttle: '40-100%',
-    gimbal: '±6°'
+    gimbal: '±6°',
+    initialVelocity: { vertical: -38, horizontal: 0 }
   },
   zhuque3_first_stage: {
     height: 40.0,
@@ -195,7 +204,8 @@ export const rocketSpecs = {
     thrust: 670,
     isp: 290,
     throttle: '40-100%',
-    gimbal: '±6°'
+    gimbal: '±6°',
+    initialVelocity: { vertical: -46, horizontal: 0 }
   }
 }
 

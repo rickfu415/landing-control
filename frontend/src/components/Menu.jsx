@@ -139,19 +139,6 @@ function Menu() {
               </div>
             </div>
             
-            {/* Start button */}
-            <button
-              onClick={startGame}
-              disabled={!connected}
-              className={`w-full py-5 rounded-lg font-display font-bold text-xl uppercase tracking-wider transition-all ${
-                connected
-                  ? 'btn-primary cursor-pointer'
-                  : 'bg-gray-700 text-gray-500 cursor-not-allowed'
-              }`}
-            >
-              {connected ? t.menu.launchMission : t.menu.connecting}
-            </button>
-            
             {/* Controls hint */}
             <div className="pt-4 border-t border-gray-700">
               <h3 className="text-sm uppercase tracking-wider text-gray-400 mb-3 font-bold">
@@ -255,11 +242,27 @@ function Menu() {
                   <span>{t.menu.briefing.initial}</span>
                 </li>
                 <li className="flex items-start gap-3">
+                  <span className="text-blue-500 text-lg">▸</span>
+                  <span className="text-white">
+                    {language === 'zh' 
+                      ? `初始速度：垂直 ${specs.initialVelocity.vertical} m/s，水平 ${specs.initialVelocity.horizontal} m/s` 
+                      : `Initial velocity: Vertical ${specs.initialVelocity.vertical} m/s, Horizontal ${specs.initialVelocity.horizontal} m/s`}
+                  </span>
+                </li>
+                <li className="flex items-start gap-3">
                   <span className="text-yellow-500 text-lg">▸</span>
                   <span className="text-yellow-400 font-semibold">
                     {language === 'zh' 
                       ? `初始燃料：${formatMass(specs.fuelMass)} - 请高效使用！` 
                       : `Initial fuel: ${formatMass(specs.fuelMass)} - be efficient!`}
+                  </span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-green-500 text-lg">▸</span>
+                  <span className="text-green-400">
+                    {language === 'zh' 
+                      ? '天气状况：晴朗，无风 (风速: 0 m/s)' 
+                      : 'Weather: Clear, No wind (Wind speed: 0 m/s)'}
                   </span>
                 </li>
                 <li className="flex items-start gap-3">
@@ -274,13 +277,28 @@ function Menu() {
             {/* Thrust Profile Planner */}
             <ThrustProfilePlanner inMenu={true} />
             
-            {/* Footer */}
-            <div className="text-center text-sm text-gray-500 italic">
-              {t.menu.footer}
-            </div>
-            
           </div>
           
+        </div>
+        
+        {/* Launch button - at the end */}
+        <div className="mt-8">
+          <button
+            onClick={startGame}
+            disabled={!connected}
+            className={`w-full py-6 rounded-lg font-display font-bold text-2xl uppercase tracking-wider transition-all ${
+              connected
+                ? 'btn-primary cursor-pointer shadow-lg shadow-rocket-orange/20'
+                : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+            }`}
+          >
+            {connected ? t.menu.launchMission : t.menu.connecting}
+          </button>
+        </div>
+        
+        {/* Footer */}
+        <div className="text-center text-sm text-gray-500 italic mt-6">
+          {t.menu.footer}
         </div>
       </div>
     </div>

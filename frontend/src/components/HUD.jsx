@@ -59,10 +59,10 @@ function HUD() {
   const isHighSpeed = Math.abs(rocket.vertical_speed) > 50 && rocket.altitude < 200
   const speed = Math.sqrt(rocket.velocity[0]**2 + rocket.velocity[1]**2 + rocket.velocity[2]**2)
   
-  // Calculate acceleration (approximate from velocity change at 60Hz)
-  const accelX = (rocket.velocity[0] - (prevVelocity?.[0] || rocket.velocity[0])) * 60
-  const accelY = (rocket.velocity[1] - (prevVelocity?.[1] || rocket.velocity[1])) * 60
-  const accelZ = (rocket.velocity[2] - (prevVelocity?.[2] || rocket.velocity[2])) * 60
+  // Calculate acceleration (approximate from velocity change at 30Hz)
+  const accelX = (rocket.velocity[0] - (prevVelocity?.[0] || rocket.velocity[0])) * 30
+  const accelY = (rocket.velocity[1] - (prevVelocity?.[1] || rocket.velocity[1])) * 30
+  const accelZ = (rocket.velocity[2] - (prevVelocity?.[2] || rocket.velocity[2])) * 30
   const totalAccel = Math.sqrt(accelX**2 + accelY**2 + accelZ**2)
   const gForce = Math.abs(accelY + GRAVITY) / GRAVITY  // G-force (1G = hovering)
   

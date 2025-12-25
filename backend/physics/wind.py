@@ -99,10 +99,15 @@ class WindModel:
     def update_time(self, dt: float):
         """
         Update internal time for time-varying wind calculations.
+        Skipped if wind is disabled for CPU optimization.
         
         Args:
             dt: Time step (seconds)
         """
+        # Skip time updates if wind is disabled (CPU optimization)
+        if not self.config.enabled:
+            return
+        
         self.time += dt
     
     def reset(self):
@@ -187,6 +192,10 @@ class WindModel:
         Returns:
             Relative velocity vector [vx, vy, vz] (m/s)
         """
+        # Skip wind calculations if disabled (CPU optimization)
+        if not self.config.enabled:
+            return rocket_velocity
+        
         wind_velocity = self.get_wind_velocity(altitude)
         return rocket_velocity - wind_velocity
     

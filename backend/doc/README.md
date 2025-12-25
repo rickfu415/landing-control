@@ -81,7 +81,7 @@ Physics-based rocket landing simulation with 6-DOF rigid body dynamics, realisti
 - `POST /api/game/{session_id}/reset` - Reset to initial state
 
 ### WebSocket
-- `/ws/{session_id}` - Real-time state updates (60 Hz)
+- `/ws/{session_id}` - Real-time state updates (30 Hz)
 - Messages: `input`, `pause`, `resume`, `reset`, `config`
 
 ## Configuration

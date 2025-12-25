@@ -10,7 +10,7 @@ import Ground from './Ground'
 // Moving clouds to show falling motion
 function MovingClouds({ velocity, altitude }) {
   const cloudsRef = useRef()
-  const cloudCount = 30
+  const cloudCount = 10  // Reduced from 30 for CPU optimization
   
   const cloudData = useMemo(() => {
     const clouds = []

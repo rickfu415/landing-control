@@ -138,7 +138,7 @@ ABORT_VELOCITY = 100.0  # m/s (above this at low altitude = abort)
 # =============================================================================
 
 # Physics update rate
-PHYSICS_TICK_RATE = 60  # Hz (updates per second)
+PHYSICS_TICK_RATE = 30  # Hz (updates per second) - balanced performance and responsiveness
 PHYSICS_DT = 1.0 / PHYSICS_TICK_RATE  # seconds per tick
 
 # Initial conditions (realistic entry scenario)

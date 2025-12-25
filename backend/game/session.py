@@ -78,6 +78,9 @@ class GameSession:
         # State broadcast callback
         self._state_callback: Optional[Callable] = None
         
+        # Cache static geometry data to avoid recalculating every frame
+        self._cached_geometry_data = None
+        
         # Reset to initial conditions
         self.reset()
     
@@ -192,10 +195,27 @@ class GameSession:
     
     def get_state(self) -> dict:
         """Get current game state as dictionary."""
+        # Cache static geometry data on first call
+        if self._cached_geometry_data is None:
+            geometry = self.physics.geometry
+            self._cached_geometry_data = {
+                "height": geometry.config.height,
+                "diameter": geometry.config.diameter,
+                "radius": geometry.radius,
+                "cross_sectional_area": geometry.cross_sectional_area,
+                "initial_fuel_mass": geometry.config.fuel_mass,
+                "thrust": geometry.config.thrust,
+                "isp": geometry.config.isp,
+                "dry_mass": geometry.config.dry_mass,
+            }
+        
         rocket_state = self.physics.state.to_dict(
             geometry=self.physics.geometry,
             aerodynamics_model=self.physics.aerodynamics
         )
+        
+        # Use cached geometry data instead of recalculating
+        rocket_state["geometry"] = self._cached_geometry_data
         
         state = {
             "session_id": self.session_id,

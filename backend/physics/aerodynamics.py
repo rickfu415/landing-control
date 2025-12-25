@@ -235,6 +235,7 @@ class AerodynamicsModel:
     ) -> np.ndarray:
         """
         Compute aerodynamic forces in body frame.
+        SIMPLIFIED VERSION for CPU optimization - uses basic drag without complex AoA calculations.
         
         Forces:
         - F_axial: Along rocket axis (x-direction)
@@ -260,106 +261,20 @@ class AerodynamicsModel:
         # Dynamic pressure: q = 0.5 * ρ * v²
         q = 0.5 * density * velocity_mag * velocity_mag
         
-        # Calculate angles
-        alpha, beta = self.calculate_angle_of_attack(velocity_body)
+        # SIMPLIFIED: Use constant drag coefficients instead of Mach-dependent
+        # This saves significant CPU by skipping angle-of-attack and Mach calculations
+        Cd_axial = 0.5  # Simplified constant drag coefficient
+        Cd_normal = 1.8  # Simplified constant normal drag
         
-        # Get drag coefficients
-        mach = self.drag_model.get_mach_number(velocity_mag, altitude)
-        Cd_axial = self.drag_model.get_axial_drag_coefficient(mach)
-        Cd_normal_alpha = self.drag_model.get_normal_drag_coefficient(alpha, mach)
-        Cd_normal_beta = self.drag_model.get_normal_drag_coefficient(beta, mach)
-        
-        # Calculate drag force components
+        # SIMPLIFIED: Apply drag opposite to velocity in each component
+        # This is much faster than complex angle-of-attack calculations
         u, v, w = velocity_body
         
-        # When rocket has forward velocity (u != 0), use standard aerodynamic model
-        if abs(u) > 0.01:
-            # Axial force (along x-axis, opposite to forward velocity)
-            F_axial = -q * cross_sectional_area * Cd_axial * np.sign(u)
-            
-            # Normal force (z-direction, from pitch angle of attack)
-            if abs(alpha) > 0.01:  # ~0.57 degrees
-                F_normal = -q * cross_sectional_area * Cd_normal_alpha * math.sin(alpha)
-            else:
-                F_normal = 0.0
-            
-            # Side force (y-direction, from sideslip)
-            if abs(beta) > 0.01:  # ~0.57 degrees
-                F_side = -q * cross_sectional_area * Cd_normal_beta * math.sin(beta)
-            else:
-                F_side = 0.0
-        else:
-            # No forward velocity: rocket is moving purely vertically/sideways
-            # Apply drag force opposite to velocity direction
-            # IMPORTANT: When falling straight down, drag should only be in vertical direction
-            # to prevent unwanted torques. Check which body frame component corresponds to vertical motion.
-            if velocity_mag > 0.1:
-                # For a rocket falling straight down (no horizontal velocity):
-                # - World velocity: [0, vy, 0] where vy < 0 (down)
-                # - Body velocity: [0, vy, 0] when upright (due to coordinate system)
-                # - But drag should oppose motion without creating side forces
-                # 
-                # The issue: body frame y (right) is aligned with world y (vertical)
-                # when upright, but drag in y-direction creates torque.
-                # Solution: Only apply drag in the direction that doesn't create torque.
-                # For vertical motion, apply drag only in z-direction (up/down in body frame).
-                
-                # Check if motion is primarily vertical (in world frame, this is y-direction)
-                # In body frame when upright: world y → body y, but we want drag in body z
-                # Actually, we need to check the actual body frame components
-                u, v, w = velocity_body
-                
-                # If motion is primarily in y-direction (sideways in body frame),
-                # but this is actually vertical in world frame when upright,
-                # we should apply drag in z-direction (vertical in body frame) instead
-                # to avoid creating torque from side forces.
-                
-                # When falling straight down (no forward velocity u ≈ 0):
-                # - World velocity: [0, vy, 0] where vy < 0 (down)
-                # - Body velocity: [0, vy, 0] when upright (body y aligns with world y)
-                # - Drag should oppose motion: apply in body y-direction (opposite to vy)
-                # - Body y → World y, so this creates vertical drag (correct)
-                # - But we need to avoid creating torque from side forces
-                #
-                # Solution: Apply drag in the direction of motion (body y) but ensure
-                # it doesn't create torque. Since COM is on the centerline, drag along
-                # the centerline (y-axis) shouldn't create torque about the centerline.
-                # However, if there's any offset, we need to be careful.
-                #
-                # Actually, the real issue is coordinate system mismatch:
-                # - When upright: body y (right) = world y (vertical)
-                # - When upright: body z (up) = world z (horizontal)
-                # So drag in body y becomes world y (vertical) ✓
-                # But drag in body z becomes world z (horizontal) ✗
-                #
-                # Apply drag opposite to velocity in body frame, but only in the component
-                # that corresponds to vertical motion in world frame.
-                F_axial = 0.0
-                
-                # If motion is in y-direction (body frame), this is vertical in world frame
-                # Apply drag in y-direction (body frame) to oppose vertical motion
-                if abs(v) > abs(u) and abs(v) > abs(w):
-                    # Motion is primarily in y-direction (vertical in world when upright)
-                    # Apply drag in y-direction - this is along the centerline, so no torque
-                    F_side = -q * cross_sectional_area * Cd_axial * np.sign(v)
-                    F_normal = 0.0
-                elif abs(w) > abs(u) and abs(w) > abs(v):
-                    # Motion is primarily in z-direction (horizontal in world when upright)
-                    # This shouldn't happen when falling straight down, but handle it
-                    F_normal = -q * cross_sectional_area * Cd_axial * np.sign(w)
-                    F_side = 0.0
-                else:
-                    # Equal components or small velocity - apply drag opposite to largest component
-                    if abs(v) > 0.01:
-                        F_side = -q * cross_sectional_area * Cd_axial * np.sign(v)
-                        F_normal = 0.0
-                    else:
-                        F_side = 0.0
-                        F_normal = 0.0
-            else:
-                F_axial = 0.0
-                F_side = 0.0
-                F_normal = 0.0
+        # Apply drag force proportional to velocity squared in each direction
+        # F_drag = -0.5 * ρ * v² * A * Cd * sign(v)
+        F_axial = -q * cross_sectional_area * Cd_axial * np.sign(u) if abs(u) > 0.01 else 0.0
+        F_side = -q * cross_sectional_area * Cd_normal * np.sign(v) if abs(v) > 0.01 else 0.0
+        F_normal = -q * cross_sectional_area * Cd_normal * np.sign(w) if abs(w) > 0.01 else 0.0
         
         return np.array([F_axial, F_side, F_normal])
     

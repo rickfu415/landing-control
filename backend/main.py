@@ -42,25 +42,34 @@ class GameInputRequest(BaseModel):
 
 
 async def game_loop():
-    """Main game loop running at 60Hz."""
+    """Main game loop running at 30Hz."""
     while True:
-        for session_id, session in list(sessions.items()):
-            if session.running and not session.paused:
-                state = session.tick()
-                
-                # Broadcast state to connected client
-                if session_id in connections:
-                    try:
-                        await connections[session_id].send_json({
-                            "type": "state",
-                            "data": state
-                        })
-                    except Exception:
-                        # Connection closed
-                        pass
+        # Only process sessions that are actually running
+        active_sessions = [
+            (sid, session) for sid, session in sessions.items()
+            if session.running and not session.paused and sid in connections
+        ]
         
-        # 60 Hz tick rate
-        await asyncio.sleep(1/60)
+        # Skip sleep if no active sessions (reduces CPU when idle)
+        if not active_sessions:
+            await asyncio.sleep(0.1)  # Check every 100ms when idle
+            continue
+        
+        for session_id, session in active_sessions:
+            state = session.tick()
+            
+            # Broadcast state to connected client
+            try:
+                await connections[session_id].send_json({
+                    "type": "state",
+                    "data": state
+                })
+            except Exception:
+                # Connection closed, will be cleaned up
+                pass
+        
+        # 30 Hz tick rate (balanced performance and responsiveness)
+        await asyncio.sleep(1/30)
 
 
 @asynccontextmanager
@@ -310,6 +319,8 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                             flight_recorder=sessions[session_id].flight_recorder,
                             difficulty=sessions[session_id].config.difficulty
                         )
+                        # Clear cached geometry data since rocket changed
+                        sessions[session_id]._cached_geometry_data = None
                         # Reset physics to apply new rocket (velocity will be calculated from terminal velocity)
                         sessions[session_id].physics.reset(
                             altitude=sessions[session_id].config.initial_altitude
@@ -330,10 +341,18 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         logger.info(f"WebSocket disconnected for session: {session_id}")
         if session_id in connections:
             del connections[session_id]
+        # Clean up session after disconnect to free memory
+        if session_id in sessions:
+            logger.info(f"Cleaning up session: {session_id}")
+            del sessions[session_id]
     except Exception as e:
         logger.error(f"WebSocket error for session {session_id}: {e}", exc_info=True)
         if session_id in connections:
             del connections[session_id]
+        # Clean up session on error
+        if session_id in sessions:
+            logger.info(f"Cleaning up session after error: {session_id}")
+            del sessions[session_id]
 
 
 if __name__ == "__main__":

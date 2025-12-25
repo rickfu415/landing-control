@@ -103,17 +103,17 @@ function HUD() {
   return (
     <div className="absolute inset-0 pointer-events-none">
       {/* Mission Time & Time to Impact - Top Center */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2">
-        <div className="bg-black/30 backdrop-blur-sm px-6 py-2 rounded-lg border border-gray-700/50">
+      <div className="absolute top-2 md:top-4 left-1/2 -translate-x-1/2 z-10">
+        <div className="bg-black/30 backdrop-blur-sm px-3 md:px-6 py-1 md:py-2 rounded-lg border border-gray-700/50">
           <div className="text-center">
-            <span className="text-[10px] text-gray-400 uppercase tracking-wider">{t.hud.missionTime}</span>
-            <div className="text-3xl font-display font-black text-white font-mono">
-              {time.toFixed(1)}<span className="text-sm text-gray-400">s</span>
+            <span className="text-[8px] md:text-[10px] text-gray-400 uppercase tracking-wider">{t.hud.missionTime}</span>
+            <div className="text-xl md:text-3xl font-display font-black text-white font-mono">
+              {time.toFixed(1)}<span className="text-xs md:text-sm text-gray-400">s</span>
             </div>
             {timeToImpact < 1000 && timeToImpact > 0 && (
-              <div className="mt-1 pt-1 border-t border-gray-600/50">
-                <span className="text-[10px] text-gray-400 uppercase tracking-wider">{t.hud.timeToImpact}</span>
-                <div className={`text-lg font-mono font-bold ${timeToImpact < 10 ? 'text-red-400 animate-pulse' : 'text-yellow-400'}`}>
+              <div className="mt-0.5 md:mt-1 pt-0.5 md:pt-1 border-t border-gray-600/50">
+                <span className="text-[8px] md:text-[10px] text-gray-400 uppercase tracking-wider">{t.hud.timeToImpact}</span>
+                <div className={`text-sm md:text-lg font-mono font-bold ${timeToImpact < 10 ? 'text-red-400 animate-pulse' : 'text-yellow-400'}`}>
                   {timeToImpact.toFixed(1)}<span className="text-xs text-gray-400">s</span>
                 </div>
               </div>
@@ -122,10 +122,10 @@ function HUD() {
         </div>
       </div>
 
-      {/* Left panel - Telemetry */}
-      <div className="absolute top-4 left-4 w-56">
-        <div className="hud-panel p-3 rounded-lg">
-          <h3 className="text-xs uppercase tracking-wider text-gray-400 mb-2 font-display">
+      {/* Left panel - Telemetry - Responsive */}
+      <div className="absolute top-16 md:top-4 left-2 md:left-4 w-40 md:w-56">
+        <div className="hud-panel p-2 md:p-3 rounded-lg text-xs md:text-sm">
+          <h3 className="text-[10px] md:text-xs uppercase tracking-wider text-gray-400 mb-1 md:mb-2 font-display">
             {t.hud.telemetry}
           </h3>
           
@@ -152,40 +152,22 @@ function HUD() {
             max={50}
           />
           
-          <div className="mt-2 pt-2 border-t border-gray-700">
-            <StatRow label={t.hud.acceleration} value={totalAccel.toFixed(1)} unit="m/s²" />
+          <div className="mt-1 md:mt-2 pt-1 md:pt-2 border-t border-gray-700 space-y-0.5">
             <StatRow label={t.hud.gForce} value={gForce.toFixed(2)} unit="G" warning={gForce > 3} />
             <StatRow label={t.hud.twr} value={twr.toFixed(2)} unit="" warning={twr > 0 && twr < 1} />
-            <StatRow label={t.hud.distToPad} value={distanceFromPad.toFixed(1)} unit="m" warning={distanceFromPad > 30} />
           </div>
         </div>
       </div>
       
-      {/* Right panel - Position & Propulsion */}
-      <div className="absolute top-4 right-4 w-56">
+      {/* Right panel - Position & Propulsion - Responsive */}
+      <div className="absolute top-16 md:top-4 right-2 md:right-4 w-40 md:w-56">
         {/* Systems - Position & Propulsion combined */}
-        <div className="hud-panel p-3 rounded-lg">
-          <h3 className="text-xs uppercase tracking-wider text-gray-400 mb-2 font-display">
-            {t.hud.position} & {t.hud.propulsion}
+        <div className="hud-panel p-2 md:p-3 rounded-lg text-xs md:text-sm">
+          <h3 className="text-[10px] md:text-xs uppercase tracking-wider text-gray-400 mb-1 md:mb-2 font-display">
+            {t.hud.propulsion}
           </h3>
           
-          {/* Position */}
-          <div className="grid grid-cols-3 gap-2 text-center mb-2">
-            <div>
-              <div className="text-[10px] text-gray-500">X</div>
-              <div className="text-sm font-mono">{rocket.position[0].toFixed(1)}</div>
-            </div>
-            <div>
-              <div className="text-[10px] text-gray-500">Y</div>
-              <div className="text-sm font-mono">{rocket.position[1].toFixed(1)}</div>
-            </div>
-            <div>
-              <div className="text-[10px] text-gray-500">Z</div>
-              <div className="text-sm font-mono">{rocket.position[2].toFixed(1)}</div>
-            </div>
-          </div>
-          
-          <div className="border-t border-gray-700 pt-2 mt-2">
+          <div className="border-gray-700">
             <Gauge 
               label={t.hud.throttle} 
               value={rocket.throttle * 100} 
@@ -201,10 +183,9 @@ function HUD() {
               warning={rocket.fuel < (maxFuel * 0.25)}
             />
             
-            <div className="mt-2 pt-2 border-t border-gray-700">
+            <div className="mt-1 md:mt-2 pt-1 md:pt-2 border-t border-gray-700 space-y-0.5">
               <StatRow label={t.hud.fuelPercent} value={fuelPercent.toFixed(1)} unit="%" warning={fuelPercent < 25} />
               <StatRow label={t.hud.thrust} value={(rocket.throttle * engineThrustKN).toFixed(0)} unit="kN" />
-              <StatRow label={t.hud.totalMass} value={totalMass.toFixed(0)} unit="kg" />
             </div>
           </div>
         </div>
